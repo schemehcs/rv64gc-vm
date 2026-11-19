@@ -1,18 +1,27 @@
 mod instruction;
 mod memory;
+mod register;
 
-use anyhow::{Ok, bail};
 use instruction::Instruction;
 use memory::Memory;
-use std::ops::{Shl, Shr};
+use register::Register;
+
+use anyhow::{Ok, bail};
 
 pub enum RetCode {
     Cont,
     Halt,
 }
 
+enum Mode {
+    User = 0,
+    Supervisor = 1,
+    Machine = 3,
+}
+
 pub struct Machine {
-    register: [i64; 32],
+    mode: Mode,
+    register: Register,
     memory: Memory,
     pc: usize,
 }
@@ -20,7 +29,8 @@ pub struct Machine {
 impl Machine {
     pub fn new(memory_size: usize) -> Self {
         Self {
-            register: [0; 32],
+            mode: Mode::Machine,
+            register: Register::new(),
             memory: Memory::new(memory_size),
             pc: 0,
         }
@@ -30,35 +40,52 @@ impl Machine {
         self.memory.store_slice(addr, bin)
     }
 
-    fn rr(&self, xx: usize) -> i64 {
-        self.register[xx]
+    pub fn call_r<F: Fn(i64, i64) -> i64>(&mut self, rd: usize, rs1: usize, rs2: usize, f: F) {
+        let (rs1_val, rs2_val) = self.register.read_pair(rs1, rs2);
+        let rd_val = f(rs1_val, rs2_val);
+        self.register.write(rd, rd_val);
     }
 
-    fn rrw(&self, xx: usize) -> i32 {
-        self.register[xx] as i32
+    pub fn call_ru<F: Fn(u64, u64) -> u64>(&mut self, rd: usize, rs1: usize, rs2: usize, f: F) {
+        let (rs1_val, rs2_val) = self.register.read_pairu(rs1, rs2);
+        let rd_val = f(rs1_val, rs2_val);
+        self.register.write_u(rd, rd_val);
     }
 
-    fn rru(&self, xx: usize) -> u64 {
-        self.register[xx] as u64
+    pub fn call_rw<F: Fn(i32, i32) -> i32>(&mut self, rd: usize, rs1: usize, rs2: usize, f: F) {
+        let (rs1_val, rs2_val) = self.register.read_pairw(rs1, rs2);
+        let rd_val = f(rs1_val, rs2_val);
+        self.register.write_w(rd, rd_val);
     }
 
-    fn rruw(&self, xx: usize) -> u32 {
-        self.register[xx] as u32
+    pub fn call_rwu<F: Fn(u32, u32) -> u32>(&mut self, rd: usize, rs1: usize, rs2: usize, f: F) {
+        let (rs1_val, rs2_val) = self.register.read_pairwu(rs1, rs2);
+        let rd_val = f(rs1_val, rs2_val);
+        self.register.write_wu(rd, rd_val);
     }
 
-    fn wr(&mut self, xx: usize, val: i64) {
-        if xx == 0 {
-            return;
-        }
-        self.register[xx] = val;
+    pub fn call_i<F: Fn(i64, i64) -> i64>(&mut self, rd: usize, rs1: usize, imm: i64, f: F) {
+        let rs1_val = self.register.read(rs1);
+        let rd_val = f(rs1_val, imm);
+        self.register.write(rd, rd_val);
     }
 
-    fn wrw(&mut self, xx: usize, val: i32) {
-        self.wr(xx, val as i64);
+    pub fn call_iw<F: Fn(i32, i32) -> i32>(&mut self, rd: usize, rs1: usize, imm: i32, f: F) {
+        let rs1_val = self.register.read_w(rs1);
+        let rd_val = f(rs1_val, imm);
+        self.register.write_w(rd, rd_val);
     }
 
-    fn wru(&mut self, xx: usize, val: u64) {
-        self.wr(xx, val as i64)
+    pub fn call_iu<F: Fn(u64, u64) -> u64>(&mut self, rd: usize, rs1: usize, imm: u64, f: F) {
+        let rs1_val = self.register.read_u(rs1);
+        let rd_val = f(rs1_val, imm);
+        self.register.write_u(rd, rd_val);
+    }
+
+    pub fn call_iwu<F: Fn(u32, u32) -> u32>(&mut self, rd: usize, rs1: usize, imm: u32, f: F) {
+        let rs1_val = self.register.read_wu(rs1);
+        let rd_val = f(rs1_val, imm);
+        self.register.write_wu(rd, rd_val);
     }
 
     fn advance_pc(&mut self) {
@@ -70,7 +97,7 @@ impl Machine {
     }
 
     fn effective_addr(&self, rs1: usize, imm: i64) -> usize {
-        self.rru(rs1).wrapping_add_signed(imm) as usize
+        self.register.read_u(rs1).wrapping_add_signed(imm) as usize
     }
 
     fn div_i64(dividend: i64, divisor: i64) -> i64 {
@@ -83,6 +110,10 @@ impl Machine {
         }
     }
 
+    fn div_u64(dividend: u64, divisor: u64) -> u64 {
+        dividend.checked_div(divisor).unwrap_or(u64::MAX)
+    }
+
     fn rem_i64(dividend: i64, divisor: i64) -> i64 {
         if divisor == 0 {
             dividend
@@ -91,6 +122,10 @@ impl Machine {
         } else {
             dividend % divisor
         }
+    }
+
+    fn rem_u64(dividend: u64, divisor: u64) -> u64 {
+        dividend.checked_div(divisor).unwrap_or(dividend)
     }
 
     fn div_i32(dividend: i32, divisor: i32) -> i32 {
@@ -103,6 +138,10 @@ impl Machine {
         }
     }
 
+    fn div_u32(dividend: u32, divisor: u32) -> u32 {
+        dividend.checked_div(divisor).unwrap_or(u32::MAX)
+    }
+
     fn rem_i32(dividend: i32, divisor: i32) -> i32 {
         if divisor == 0 {
             dividend
@@ -111,6 +150,10 @@ impl Machine {
         } else {
             dividend % divisor
         }
+    }
+
+    fn rem_u32(dividend: u32, divisor: u32) -> u32 {
+        dividend.checked_rem(divisor).unwrap_or(dividend)
     }
 
     fn parse_ir(&self) -> anyhow::Result<Instruction> {
@@ -122,357 +165,313 @@ impl Machine {
         use Instruction::*;
         match inst {
             Add { rd, rs1, rs2 } => {
-                self.wr(*rd, self.rr(*rs1).wrapping_add(self.rr(*rs2)));
+                self.call_r(*rd, *rs1, *rs2, i64::wrapping_add);
                 self.advance_pc();
             }
             Sub { rd, rs1, rs2 } => {
-                self.wr(*rd, self.rr(*rs1).wrapping_sub(self.rr(*rs2)));
+                self.call_r(*rd, *rs1, *rs2, i64::wrapping_sub);
                 self.advance_pc();
             }
             Xor { rd, rs1, rs2 } => {
-                self.wr(*rd, self.rr(*rs1) ^ self.rr(*rs2));
+                self.call_r(*rd, *rs1, *rs2, |x, y| x ^ y);
                 self.advance_pc();
             }
             Or { rd, rs1, rs2 } => {
-                self.wr(*rd, self.rr(*rs1) | self.rr(*rs2));
+                self.call_r(*rd, *rs1, *rs2, |x, y| x | y);
                 self.advance_pc();
             }
             And { rd, rs1, rs2 } => {
-                self.wr(*rd, self.rr(*rs1) & self.rr(*rs2));
+                self.call_r(*rd, *rs1, *rs2, |x, y| x & y);
                 self.advance_pc();
             }
             Sll { rd, rs1, rs2 } => {
-                self.wr(*rd, self.rr(*rs1) << (self.rru(*rs2) & 0x3f));
+                self.call_r(*rd, *rs1, *rs2, |x, y| x << (y & 0x3f));
                 self.advance_pc();
             }
             Srl { rd, rs1, rs2 } => {
-                self.wr(*rd, (self.rru(*rs1) >> (self.rru(*rs2) & 0x3f)) as i64);
+                self.call_ru(*rd, *rs1, *rs2, |x, y| x >> (y & 0x3f));
                 self.advance_pc();
             }
             Sra { rd, rs1, rs2 } => {
-                self.wr(*rd, self.rr(*rs1) >> (self.rru(*rs2) & 0x3f));
+                self.call_r(*rd, *rs1, *rs2, |x, y| x >> (y & 0x3f));
                 self.advance_pc();
             }
             Slt { rd, rs1, rs2 } => {
-                if self.rr(*rs1) < self.rr(*rs2) {
-                    self.wr(*rd, 1);
-                } else {
-                    self.wr(*rd, 0);
-                }
+                self.call_r(*rd, *rs1, *rs2, |x, y| if x < y { 1 } else { 0 });
                 self.advance_pc();
             }
             Sltu { rd, rs1, rs2 } => {
-                if self.rru(*rs1) < self.rru(*rs2) {
-                    self.wr(*rd, 1);
-                } else {
-                    self.wr(*rd, 0);
-                }
+                self.call_ru(*rd, *rs1, *rs2, |x, y| if x < y { 1 } else { 0 });
                 self.advance_pc();
             }
             Mul { rd, rs1, rs2 } => {
-                let rs1_val = self.rr(*rs1);
-                let rs2_val = self.rr(*rs2);
-                let rd_val = rs1_val.wrapping_mul(rs2_val);
-                self.wr(*rd, rd_val);
+                self.call_r(*rd, *rs1, *rs2, i64::wrapping_mul);
                 self.advance_pc();
             }
             Mulh { rd, rs1, rs2 } => {
-                let rs1_val = self.rr(*rs1) as i128;
-                let rs2_val = self.rr(*rs2) as i128;
-                let rd_val = ((rs1_val * rs2_val) >> 64) as i64;
-                self.wr(*rd, rd_val);
+                self.call_r(*rd, *rs1, *rs2, |x, y| {
+                    ((x as i128 * y as i128) >> 64) as i64
+                });
                 self.advance_pc();
             }
             Mulhsu { rd, rs1, rs2 } => {
-                let rs1_val = self.rr(*rs1) as i128;
-                let rs2_val = self.rru(*rs2) as i128;
-                let rd_val = ((rs1_val * rs2_val) >> 64) as i64;
-                self.wr(*rd, rd_val);
+                self.call_r(*rd, *rs1, *rs2, |x, y| {
+                    ((x as i128 * y as i128) >> 64) as i64
+                });
                 self.advance_pc();
             }
             Mulhu { rd, rs1, rs2 } => {
-                let rs1_val = self.rru(*rs1) as u128;
-                let rs2_val = self.rru(*rs2) as u128;
-                let rd_val = ((rs1_val * rs2_val) >> 64) as u64;
-                self.wru(*rd, rd_val);
+                self.call_ru(*rd, *rs1, *rs2, |x, y| {
+                    ((x as u128 * y as u128) >> 64) as u64
+                });
                 self.advance_pc();
             }
             Div { rd, rs1, rs2 } => {
-                let rd_val = Self::div_i64(self.rr(*rs1), self.rr(*rs2));
-                self.wr(*rd, rd_val);
+                self.call_r(*rd, *rs1, *rs2, Self::div_i64);
                 self.advance_pc();
             }
             Divu { rd, rs1, rs2 } => {
-                let divisor = self.rru(*rs2);
-                let rd_val = if divisor == 0 {
-                    u64::MAX
-                } else {
-                    self.rru(*rs1) / divisor
-                };
-                self.wru(*rd, rd_val);
+                self.call_ru(*rd, *rs1, *rs2, Self::div_u64);
                 self.advance_pc();
             }
             Rem { rd, rs1, rs2 } => {
-                let rd_val = Self::rem_i64(self.rr(*rs1), self.rr(*rs2));
-                self.wr(*rd, rd_val);
+                self.call_r(*rd, *rs1, *rs2, Self::rem_i64);
                 self.advance_pc();
             }
             Remu { rd, rs1, rs2 } => {
-                let divisor = self.rru(*rs2);
-                let rd_val = if divisor == 0 {
-                    self.rru(*rs1)
-                } else {
-                    self.rru(*rs1) % divisor
-                };
-                self.wru(*rd, rd_val);
+                self.call_ru(*rd, *rs1, *rs2, Self::rem_u64);
                 self.advance_pc();
             }
             Addw { rd, rs1, rs2 } => {
-                let rd_val = self.rrw(*rs1).wrapping_add(self.rrw(*rs2));
-                self.wrw(*rd, rd_val);
+                self.call_rw(*rd, *rs1, *rs2, i32::wrapping_add);
                 self.advance_pc();
             }
             Subw { rd, rs1, rs2 } => {
-                let rd_val = self.rrw(*rs1).wrapping_sub(self.rrw(*rs2));
-                self.wrw(*rd, rd_val);
+                self.call_rw(*rd, *rs1, *rs2, i32::wrapping_sub);
                 self.advance_pc();
             }
             Sllw { rd, rs1, rs2 } => {
-                let rd_val = self.rrw(*rs1).shl(self.rrw(*rs2) & 0x1f);
-                self.wrw(*rd, rd_val);
+                self.call_rw(*rd, *rs1, *rs2, |x, y| x << (y & 0x1f));
                 self.advance_pc();
             }
             Srlw { rd, rs1, rs2 } => {
-                let rd_val = self.rruw(*rs1).shr(self.rruw(*rs2) & 0x1f);
-                self.wrw(*rd, rd_val as i32);
+                self.call_rwu(*rd, *rs1, *rs2, |x, y| x >> (y & 0x1f));
                 self.advance_pc();
             }
             Sraw { rd, rs1, rs2 } => {
-                let rd_val = self.rrw(*rs1).shr(self.rrw(*rs2) & 0x1f);
-                self.wrw(*rd, rd_val);
+                self.call_rw(*rd, *rs1, *rs2, |x, y| x >> (y & 0x1f));
                 self.advance_pc();
             }
             Mulw { rd, rs1, rs2 } => {
-                let rd_val = self.rrw(*rs1).wrapping_mul(self.rrw(*rs2));
-                self.wrw(*rd, rd_val);
+                self.call_rw(*rd, *rs1, *rs2, i32::wrapping_mul);
                 self.advance_pc();
             }
             Divw { rd, rs1, rs2 } => {
-                let rd_val = Self::div_i32(self.rrw(*rs1), self.rrw(*rs2));
-                self.wrw(*rd, rd_val);
+                self.call_rw(*rd, *rs1, *rs2, Self::div_i32);
                 self.advance_pc();
             }
             Divuw { rd, rs1, rs2 } => {
-                let divisor = self.rruw(*rs2);
-                let rd_val = if divisor == 0 {
-                    u32::MAX
-                } else {
-                    self.rruw(*rs1) / divisor
-                };
-                self.wrw(*rd, rd_val as i32);
+                self.call_rwu(*rd, *rs1, *rs2, Self::div_u32);
                 self.advance_pc();
             }
             Remw { rd, rs1, rs2 } => {
-                let rd_val = Self::rem_i32(self.rrw(*rs1), self.rrw(*rs2));
-                self.wrw(*rd, rd_val);
+                self.call_rw(*rd, *rs1, *rs2, Self::rem_i32);
                 self.advance_pc();
             }
             Remuw { rd, rs1, rs2 } => {
-                let divisor = self.rruw(*rs2);
-                let rd_val = if divisor == 0 {
-                    self.rruw(*rs1)
-                } else {
-                    self.rruw(*rs1) % divisor
-                };
-                self.wrw(*rd, rd_val as i32);
+                self.call_rwu(*rd, *rs1, *rs2, Self::rem_u32);
                 self.advance_pc();
             }
             Addi { rd, rs1, imm } => {
-                self.wr(*rd, self.rr(*rs1).wrapping_add(*imm));
+                self.call_i(*rd, *rs1, *imm, i64::wrapping_add);
                 self.advance_pc();
             }
             Xori { rd, rs1, imm } => {
-                self.wr(*rd, self.rr(*rs1) ^ *imm);
+                self.call_i(*rd, *rs1, *imm, |x, y| x ^ y);
                 self.advance_pc();
             }
             Ori { rd, rs1, imm } => {
-                self.wr(*rd, self.rr(*rs1) | *imm);
+                self.call_i(*rd, *rs1, *imm, |x, y| x | y);
                 self.advance_pc();
             }
             Andi { rd, rs1, imm } => {
-                self.wr(*rd, self.rr(*rs1) & *imm);
+                self.call_i(*rd, *rs1, *imm, |x, y| x & y);
                 self.advance_pc();
             }
             Slli { rd, rs1, imm } => {
-                self.wru(*rd, self.rru(*rs1).wrapping_shl(*imm));
+                self.call_iu(*rd, *rs1, *imm as u64, |x, y| x << (y & 0x3f));
                 self.advance_pc();
             }
             Srli { rd, rs1, imm } => {
-                self.wru(*rd, self.rru(*rs1).wrapping_shr(*imm));
+                self.call_iu(*rd, *rs1, *imm as u64, |x, y| x >> (y & 0x3f));
                 self.advance_pc();
             }
             Srai { rd, rs1, imm } => {
-                self.wr(*rd, self.rr(*rs1).wrapping_shr(*imm));
+                self.call_i(*rd, *rs1, *imm as i64, |x, y| x >> (y & 0x3f));
                 self.advance_pc();
             }
             Slti { rd, rs1, imm } => {
-                self.wr(*rd, if self.rr(*rs1) < *imm { 1 } else { 0 });
+                self.call_i(*rd, *rs1, *imm, |x, y| if x < y { 1 } else { 0 });
                 self.advance_pc();
             }
             Sltiu { rd, rs1, imm } => {
-                self.wr(*rd, if self.rru(*rs1) < *imm { 1 } else { 0 });
+                self.call_iu(*rd, *rs1, *imm, |x, y| if x < y { 1 } else { 0 });
                 self.advance_pc();
             }
             Addiw { rd, rs1, imm } => {
-                let rs1_val = self.rr(*rs1) as i32;
-                let rd_val = rs1_val.wrapping_add(*imm as i32);
-                self.wr(*rd, rd_val as i64);
+                self.call_iw(*rd, *rs1, *imm, i32::wrapping_add);
                 self.advance_pc();
             }
             Slliw { rd, rs1, imm } => {
-                let rs1_val = self.rr(*rs1) as i32;
-                let rd_val = rs1_val.shl(*imm & 0x1f);
-                self.wr(*rd, rd_val as i64);
+                self.call_iw(*rd, *rs1, *imm, |x, y| x << (y & 0x1f));
                 self.advance_pc();
             }
             Srliw { rd, rs1, imm } => {
-                let rs1_val = self.rr(*rs1) as u32;
-                let rd_val = rs1_val.shr(*imm & 0x1f);
-                self.wr(*rd, rd_val as i32 as i64);
+                self.call_iwu(*rd, *rs1, *imm, |x, y| x >> (y & 0x1f));
                 self.advance_pc();
             }
             Sraiw { rd, rs1, imm } => {
-                let rs1_val = self.rr(*rs1) as i32;
-                let rd_val = rs1_val.shr(*imm & 0x1f);
-                self.wr(*rd, rd_val as i64);
+                self.call_iw(*rd, *rs1, *imm, |x, y| x >> (y & 0x1f));
                 self.advance_pc();
             }
             Lb { rd, rs1, imm } => {
                 let addr = self.effective_addr(*rs1, *imm);
                 let byte = self.memory.load_u8(addr)?;
-                self.wr(*rd, byte as i8 as i64);
+                self.register.write(*rd, byte as i8 as i64);
                 self.advance_pc();
             }
             Lh { rd, rs1, imm } => {
                 let addr = self.effective_addr(*rs1, *imm);
                 let hw = self.memory.load_u16(addr)?;
-                self.wr(*rd, hw as i16 as i64);
+                self.register.write(*rd, hw as i16 as i64);
                 self.advance_pc();
             }
             Lw { rd, rs1, imm } => {
                 let addr = self.effective_addr(*rs1, *imm);
                 let wd = self.memory.load_u32(addr)?;
-                self.wr(*rd, wd as i32 as i64);
+                self.register.write(*rd, wd as i32 as i64);
                 self.advance_pc();
             }
             Ld { rd, rs1, imm } => {
                 let addr = self.effective_addr(*rs1, *imm);
                 let dd = self.memory.load_u64(addr)?;
-                self.wru(*rd, dd);
+                self.register.write_u(*rd, dd);
                 self.advance_pc();
             }
             Lbu { rd, rs1, imm } => {
                 let addr = self.effective_addr(*rs1, *imm);
-                self.wru(*rd, self.memory.load_u8(addr)? as u64);
+                let byte = self.memory.load_u8(addr)?;
+                self.register.write_u(*rd, byte as u64);
                 self.advance_pc();
             }
             Lhu { rd, rs1, imm } => {
                 let addr = self.effective_addr(*rs1, *imm);
-                self.wru(*rd, self.memory.load_u16(addr)? as u64);
+                let hw = self.memory.load_u16(addr)?;
+                self.register.write_u(*rd, hw as u64);
                 self.advance_pc();
             }
             Lwu { rd, rs1, imm } => {
                 let addr = self.effective_addr(*rs1, *imm);
-                self.wru(*rd, self.memory.load_u32(addr)? as u64);
+                let wd = self.memory.load_u32(addr)?;
+                self.register.write_u(*rd, wd as u64);
                 self.advance_pc();
             }
             Sb { rs2, imm, rs1 } => {
                 let addr = self.effective_addr(*rs1, *imm);
-                let byte = self.rr(*rs2) as u8;
+                let byte = self.register.read(*rs2) as u8;
                 self.memory.store_u8(addr, byte)?;
                 self.advance_pc();
             }
             Sh { rs2, imm, rs1 } => {
                 let addr = self.effective_addr(*rs1, *imm);
-                let val = self.rr(*rs2) as u16;
+                let val = self.register.read(*rs2) as u16;
                 self.memory.store_slice(addr, &val.to_le_bytes())?;
                 self.advance_pc();
             }
             Sw { rs2, imm, rs1 } => {
                 let addr = self.effective_addr(*rs1, *imm);
-                let val = self.rr(*rs2) as u32;
+                let val = self.register.read(*rs2) as u32;
                 self.memory.store_slice(addr, &val.to_le_bytes())?;
                 self.advance_pc();
             }
             Sd { rs2, imm, rs1 } => {
                 let addr = self.effective_addr(*rs1, *imm);
-                let val = self.rr(*rs2);
+                let val = self.register.read(*rs2);
                 self.memory.store_slice(addr, &val.to_le_bytes())?;
                 self.advance_pc();
             }
             Beq { rs1, rs2, imm } => {
-                if self.rr(*rs1) == self.rr(*rs2) {
+                let (rs1_val, rs2_val) = self.register.read_pair(*rs1, *rs2);
+                if rs1_val == rs2_val {
                     self.jump(*imm);
                 } else {
                     self.advance_pc();
                 }
             }
             Bne { rs1, rs2, imm } => {
-                if self.rr(*rs1) != self.rr(*rs2) {
+                let (rs1_val, rs2_val) = self.register.read_pair(*rs1, *rs2);
+                if rs1_val != rs2_val {
                     self.jump(*imm);
                 } else {
                     self.advance_pc();
                 }
             }
             Blt { rs1, rs2, imm } => {
-                if self.rr(*rs1) < self.rr(*rs2) {
+                let (rs1_val, rs2_val) = self.register.read_pair(*rs1, *rs2);
+                if rs1_val < rs2_val {
                     self.jump(*imm);
                 } else {
                     self.advance_pc();
                 }
             }
             Bge { rs1, rs2, imm } => {
-                if self.rr(*rs1) >= self.rr(*rs2) {
+                let (rs1_val, rs2_val) = self.register.read_pair(*rs1, *rs2);
+                if rs1_val >= rs2_val {
                     self.jump(*imm);
                 } else {
                     self.advance_pc();
                 }
             }
             Bltu { rs1, rs2, imm } => {
-                if self.rru(*rs1) < self.rru(*rs2) {
+                let (rs1_val, rs2_val) = self.register.read_pair(*rs1, *rs2);
+                if rs1_val < rs2_val {
                     self.jump(*imm);
                 } else {
                     self.advance_pc();
                 }
             }
             Bgeu { rs1, rs2, imm } => {
-                if self.rru(*rs1) >= self.rru(*rs2) {
+                let (rs1_val, rs2_val) = self.register.read_pairu(*rs1, *rs2);
+                if rs1_val >= rs2_val {
                     self.jump(*imm);
                 } else {
                     self.advance_pc();
                 }
             }
             Jal { rd, imm } => {
-                self.wru(*rd, (self.pc as u64).wrapping_add(4));
+                let next_pc = (self.pc as u64).wrapping_add(4);
+                self.register.write_u(*rd, next_pc);
                 self.jump(*imm);
             }
             Jalr { rd, rs1, imm } => {
                 let target = self.effective_addr(*rs1, *imm) & !1;
-                self.wru(*rd, (self.pc as u64).wrapping_add(4));
+                let next_pc = (self.pc as u64).wrapping_add(4);
+                self.register.write_u(*rd, next_pc);
                 self.pc = target;
             }
             Lui { rd, imm } => {
-                self.wr(*rd, *imm);
+                self.register.write(*rd, *imm);
                 self.advance_pc();
             }
             Auipc { rd, imm } => {
-                let val = (self.pc as u64).wrapping_add_signed(*imm);
-                self.wru(*rd, val);
+                let target = (self.pc as u64).wrapping_add_signed(*imm);
+                self.register.write_u(*rd, target);
                 self.advance_pc();
             }
             Ecall => bail!("ecall not supported"),
             Ebreak => return Ok(RetCode::Halt),
             Fence => self.advance_pc(),
+            _ => todo!(),
         }
         Ok(RetCode::Cont)
     }
@@ -494,7 +493,7 @@ impl Machine {
             if i % 4 == 0 {
                 print!("{:02}: ", i);
             }
-            print!("{:016x} ", self.register[i]);
+            print!("{:016x} ", self.register.read(i));
             if i % 4 == 3 {
                 println!();
             }
@@ -513,8 +512,8 @@ mod execute_ir_tests {
     #[test]
     fn store_halfword_writes_two_bytes() {
         let mut machine = Machine::new(16);
-        machine.register[1] = 4;
-        machine.register[2] = 0x1234_5678;
+        machine.register.write(1, 4);
+        machine.register.write(2, 0x1234_5678);
 
         machine
             .execute_ir(&Sh {
@@ -531,8 +530,8 @@ mod execute_ir_tests {
     #[test]
     fn store_word_writes_four_bytes() {
         let mut machine = Machine::new(16);
-        machine.register[1] = 4;
-        machine.register[2] = 0x1234_5678;
+        machine.register.write(1, 4);
+        machine.register.write(2, 0x1234_5678);
 
         machine
             .execute_ir(&Sw {
@@ -552,8 +551,8 @@ mod execute_ir_tests {
     #[test]
     fn sll_uses_only_the_low_six_shift_bits() {
         let mut machine = Machine::new(16);
-        machine.register[1] = 0x8000_0000_0000_0001_u64 as i64;
-        machine.register[2] = 0x41;
+        machine.register.write(1, 0x8000_0000_0000_0001_u64 as i64);
+        machine.register.write(2, 0x41);
         machine
             .execute_ir(&Sll {
                 rd: 3,
@@ -561,14 +560,14 @@ mod execute_ir_tests {
                 rs2: 2,
             })
             .unwrap();
-        assert_eq!(machine.rru(3), 2);
+        assert_eq!(machine.register.read_u(3), 2);
     }
 
     #[test]
     fn srl_uses_only_the_low_six_shift_bits() {
         let mut machine = Machine::new(16);
-        machine.register[1] = 0x8000_0000_0000_0001_u64 as i64;
-        machine.register[2] = 0x41;
+        machine.register.write(1, 0x8000_0000_0000_0001_u64 as i64);
+        machine.register.write(2, 0x41);
         machine
             .execute_ir(&Srl {
                 rd: 4,
@@ -576,14 +575,14 @@ mod execute_ir_tests {
                 rs2: 2,
             })
             .unwrap();
-        assert_eq!(machine.rru(4), 0x4000_0000_0000_0000);
+        assert_eq!(machine.register.read_u(4), 0x4000_0000_0000_0000);
     }
 
     #[test]
     fn sra_uses_only_the_low_six_shift_bits() {
         let mut machine = Machine::new(16);
-        machine.register[1] = 0x8000_0000_0000_0001_u64 as i64;
-        machine.register[2] = 0x41;
+        machine.register.write(1, 0x8000_0000_0000_0001_u64 as i64);
+        machine.register.write(2, 0x41);
         machine
             .execute_ir(&Sra {
                 rd: 5,
@@ -591,14 +590,13 @@ mod execute_ir_tests {
                 rs2: 2,
             })
             .unwrap();
-        assert_eq!(machine.rr(5), 0xc000_0000_0000_0000_u64 as i64);
+        assert_eq!(machine.register.read(5), 0xc000_0000_0000_0000_u64 as i64);
     }
 
     #[test]
     fn jalr_reads_source_before_link_write_and_clears_bit_zero() {
         let mut machine = Machine::new(16);
-        machine.register[1] = 101;
-
+        machine.register.write(1, 101);
         machine
             .execute_ir(&Jalr {
                 rd: 1,
@@ -607,15 +605,15 @@ mod execute_ir_tests {
             })
             .unwrap();
 
-        assert_eq!(machine.register[1], 4);
+        assert_eq!(machine.register.read(1), 4);
         assert_eq!(machine.pc, 102);
     }
 
     #[test]
     fn memory_addresses_wrap_as_rv32_addresses() {
         let mut machine = Machine::new(8);
-        machine.register[1] = -1;
-        machine.register[2] = 0x5a;
+        machine.register.write(1, -1);
+        machine.register.write(2, 0x5a);
 
         machine
             .execute_ir(&Sb {
@@ -631,8 +629,8 @@ mod execute_ir_tests {
     #[test]
     fn out_of_bounds_store_returns_error_without_advancing_pc() {
         let mut machine = Machine::new(4);
-        machine.register[1] = 3;
-        machine.register[2] = 0x1234;
+        machine.register.write(1, 3);
+        machine.register.write(2, 0x1234);
 
         assert!(
             machine
@@ -649,7 +647,7 @@ mod execute_ir_tests {
     #[test]
     fn out_of_bounds_load_returns_error_without_advancing_pc() {
         let mut machine = Machine::new(4);
-        machine.register[1] = 3;
+        machine.register.write(1, 3);
         assert!(
             machine
                 .execute_ir(&Lw {
@@ -672,8 +670,8 @@ mod execute_ir_tests {
     #[test]
     fn signed_division_handles_zero_and_overflow() {
         let mut machine = Machine::new(16);
-        machine.register[1] = i64::MIN;
-        machine.register[2] = -1;
+        machine.register.write(1, i64::MIN);
+        machine.register.write(2, -1);
 
         machine
             .execute_ir(&Div {
@@ -682,9 +680,9 @@ mod execute_ir_tests {
                 rs2: 2,
             })
             .unwrap();
-        assert_eq!(machine.rr(3), i64::MIN);
+        assert_eq!(machine.register.read(3), i64::MIN);
 
-        machine.register[2] = 0;
+        machine.register.write(2, 0);
         machine
             .execute_ir(&Div {
                 rd: 4,
@@ -692,7 +690,7 @@ mod execute_ir_tests {
                 rs2: 2,
             })
             .unwrap();
-        assert_eq!(machine.rr(4), -1);
+        assert_eq!(machine.register.read(4), -1);
 
         machine
             .execute_ir(&Rem {
@@ -701,14 +699,14 @@ mod execute_ir_tests {
                 rs2: 2,
             })
             .unwrap();
-        assert_eq!(machine.rr(5), i64::MIN);
+        assert_eq!(machine.register.read(5), i64::MIN);
     }
 
     #[test]
     fn unsigned_division_handles_zero() {
         let mut machine = Machine::new(16);
-        machine.register[1] = 7;
-        machine.register[2] = 0;
+        machine.register.write(1, 7);
+        machine.register.write(2, 0);
 
         machine
             .execute_ir(&Divu {
@@ -717,7 +715,7 @@ mod execute_ir_tests {
                 rs2: 2,
             })
             .unwrap();
-        assert_eq!(machine.rru(3), u64::MAX);
+        assert_eq!(machine.register.read_u(3), u64::MAX);
 
         machine
             .execute_ir(&Remu {
@@ -726,14 +724,14 @@ mod execute_ir_tests {
                 rs2: 2,
             })
             .unwrap();
-        assert_eq!(machine.rru(4), 7);
+        assert_eq!(machine.register.read(4), 7);
     }
 
     #[test]
     fn word_division_handles_zero_and_overflow() {
         let mut machine = Machine::new(16);
-        machine.register[1] = i32::MIN as i64;
-        machine.register[2] = -1;
+        machine.register.write(1, i32::MIN as i64);
+        machine.register.write(2, -1);
 
         machine
             .execute_ir(&Divw {
@@ -742,9 +740,9 @@ mod execute_ir_tests {
                 rs2: 2,
             })
             .unwrap();
-        assert_eq!(machine.rrw(3), i32::MIN);
+        assert_eq!(machine.register.read_w(3), i32::MIN);
 
-        machine.register[2] = 0;
+        machine.register.write(2, 0);
         machine
             .execute_ir(&Remw {
                 rd: 4,
@@ -752,14 +750,14 @@ mod execute_ir_tests {
                 rs2: 2,
             })
             .unwrap();
-        assert_eq!(machine.rrw(4), i32::MIN);
+        assert_eq!(machine.register.read_w(4), i32::MIN);
     }
 
     #[test]
     fn word_division_by_zero_returns_specified_values() {
         let mut machine = Machine::new(16);
-        machine.register[1] = 0x1234_5678_8000_0007;
-        machine.register[2] = 0;
+        machine.register.write(1, 0x1234_5678_8000_0007);
+        machine.register.write(2, 0);
 
         machine
             .execute_ir(&Divw {
@@ -768,7 +766,7 @@ mod execute_ir_tests {
                 rs2: 2,
             })
             .unwrap();
-        assert_eq!(machine.rr(3), -1);
+        assert_eq!(machine.register.read(3), -1);
 
         machine
             .execute_ir(&Divuw {
@@ -777,7 +775,7 @@ mod execute_ir_tests {
                 rs2: 2,
             })
             .unwrap();
-        assert_eq!(machine.rr(4), -1);
+        assert_eq!(machine.register.read(4), -1);
 
         machine
             .execute_ir(&Remuw {
@@ -786,14 +784,14 @@ mod execute_ir_tests {
                 rs2: 2,
             })
             .unwrap();
-        assert_eq!(machine.rr(5), 0xffff_ffff_8000_0007_u64 as i64);
+        assert_eq!(machine.register.read(5), 0xffff_ffff_8000_0007_u64 as i64);
     }
 
     #[test]
     fn word_remainder_overflow_returns_zero() {
         let mut machine = Machine::new(16);
-        machine.register[1] = i32::MIN as i64;
-        machine.register[2] = -1;
+        machine.register.write(1, i32::MIN as i64);
+        machine.register.write(2, -1);
 
         machine
             .execute_ir(&Remw {
@@ -802,7 +800,7 @@ mod execute_ir_tests {
                 rs2: 2,
             })
             .unwrap();
-        assert_eq!(machine.rr(3), 0);
+        assert_eq!(machine.register.read(3), 0);
     }
 
     #[test]

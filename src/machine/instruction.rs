@@ -216,13 +216,13 @@ pub enum Instruction {
     Addiw {
         rd: usize,
         rs1: usize,
-        imm: i64,
+        imm: i32,
     },
     /// Shift Left Logical Imm word rd = rs1 << imm
     Slliw {
         rd: usize,
         rs1: usize,
-        imm: u32,
+        imm: i32,
     },
     /// Shift Right Logical Imm word rd = rs1 >> imm
     Srliw {
@@ -234,7 +234,7 @@ pub enum Instruction {
     Sraiw {
         rd: usize,
         rs1: usize,
-        imm: u32,
+        imm: i32,
     },
     /// Load Byte rd = M[rs1+imm][0:7]
     Lb {
@@ -365,79 +365,36 @@ pub enum Instruction {
     Ebreak,
     /// Fence memory and I/O operations
     Fence,
-}
-
-impl fmt::Display for Instruction {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Instruction::*;
-        match self {
-            Add { rd, rs1, rs2 } => write!(f, "add x{rd}, x{rs1}, x{rs2}"),
-            Sub { rd, rs1, rs2 } => write!(f, "sub x{rd}, x{rs1}, x{rs2}"),
-            Xor { rd, rs1, rs2 } => write!(f, "xor x{rd}, x{rs1}, x{rs2}"),
-            Or { rd, rs1, rs2 } => write!(f, "or x{rd}, x{rs1}, x{rs2}"),
-            And { rd, rs1, rs2 } => write!(f, "and x{rd}, x{rs1}, x{rs2}"),
-            Sll { rd, rs1, rs2 } => write!(f, "sll x{rd}, x{rs1}, x{rs2}"),
-            Srl { rd, rs1, rs2 } => write!(f, "srl x{rd}, x{rs1}, x{rs2}"),
-            Sra { rd, rs1, rs2 } => write!(f, "sra x{rd}, x{rs1}, x{rs2}"),
-            Slt { rd, rs1, rs2 } => write!(f, "slt x{rd}, x{rs1}, x{rs2}"),
-            Sltu { rd, rs1, rs2 } => write!(f, "sltu x{rd}, x{rs1}, x{rs2}"),
-            Mul { rd, rs1, rs2 } => write!(f, "mul x{rd}, x{rs1}, x{rs2}"),
-            Mulh { rd, rs1, rs2 } => write!(f, "mulh x{rd}, x{rs1}, x{rs2}"),
-            Mulhsu { rd, rs1, rs2 } => write!(f, "mulhsu x{rd}, x{rs1}, x{rs2}"),
-            Mulhu { rd, rs1, rs2 } => write!(f, "mulhu x{rd}, x{rs1}, x{rs2}"),
-            Div { rd, rs1, rs2 } => write!(f, "div x{rd}, x{rs1}, x{rs2}"),
-            Divu { rd, rs1, rs2 } => write!(f, "divu x{rd}, x{rs1}, x{rs2}"),
-            Rem { rd, rs1, rs2 } => write!(f, "rem x{rd}, x{rs1}, x{rs2}"),
-            Remu { rd, rs1, rs2 } => write!(f, "remu x{rd}, x{rs1}, x{rs2}"),
-            Addw { rd, rs1, rs2 } => write!(f, "addw x{rd}, x{rs1}, x{rs2}"),
-            Subw { rd, rs1, rs2 } => write!(f, "subw x{rd}, x{rs1}, x{rs2}"),
-            Sllw { rd, rs1, rs2 } => write!(f, "sllw x{rd}, x{rs1}, x{rs2}"),
-            Srlw { rd, rs1, rs2 } => write!(f, "srlw x{rd}, x{rs1}, x{rs2}"),
-            Sraw { rd, rs1, rs2 } => write!(f, "sraw x{rd}, x{rs1}, x{rs2}"),
-            Mulw { rd, rs1, rs2 } => write!(f, "mulw x{rd}, x{rs1}, x{rs2}"),
-            Divw { rd, rs1, rs2 } => write!(f, "divw x{rd}, x{rs1}, x{rs2}"),
-            Divuw { rd, rs1, rs2 } => write!(f, "divuw x{rd}, x{rs1}, x{rs2}"),
-            Remw { rd, rs1, rs2 } => write!(f, "remw x{rd}, x{rs1}, x{rs2}"),
-            Remuw { rd, rs1, rs2 } => write!(f, "remuw x{rd}, x{rs1}, x{rs2}"),
-            Addi { rd, rs1, imm } => write!(f, "addi x{rd}, x{rs1}, {imm}"),
-            Xori { rd, rs1, imm } => write!(f, "xori x{rd}, x{rs1}, {imm}"),
-            Ori { rd, rs1, imm } => write!(f, "ori x{rd}, x{rs1}, {imm}"),
-            Andi { rd, rs1, imm } => write!(f, "andi x{rd}, x{rs1}, {imm}"),
-            Slli { rd, rs1, imm } => write!(f, "slli x{rd}, x{rs1}, {imm}"),
-            Srli { rd, rs1, imm } => write!(f, "srli x{rd}, x{rs1}, {imm}"),
-            Srai { rd, rs1, imm } => write!(f, "srai x{rd}, x{rs1}, {imm}"),
-            Slti { rd, rs1, imm } => write!(f, "slti x{rd}, x{rs1}, {imm}"),
-            Sltiu { rd, rs1, imm } => write!(f, "sltiu x{rd}, x{rs1}, {}", *imm as i32),
-            Addiw { rd, rs1, imm } => write!(f, "addiw x{rd}, x{rs1}, {}", *imm),
-            Slliw { rd, rs1, imm } => write!(f, "slliw x{rd}, x{rs1}, {}", *imm),
-            Srliw { rd, rs1, imm } => write!(f, "srliw x{rd}, x{rs1}, {}", *imm),
-            Sraiw { rd, rs1, imm } => write!(f, "sraiw x{rd}, x{rs1}, {}", *imm),
-            Lb { rd, rs1, imm } => write!(f, "lb x{rd}, {imm}(x{rs1})"),
-            Lh { rd, rs1, imm } => write!(f, "lh x{rd}, {imm}(x{rs1})"),
-            Lw { rd, rs1, imm } => write!(f, "lw x{rd}, {imm}(x{rs1})"),
-            Ld { rd, rs1, imm } => write!(f, "ld x{rd}, {imm}(x{rs1})"),
-            Lbu { rd, rs1, imm } => write!(f, "lbu x{rd}, {imm}(x{rs1})"),
-            Lhu { rd, rs1, imm } => write!(f, "lhu x{rd}, {imm}(x{rs1})"),
-            Lwu { rd, rs1, imm } => write!(f, "lwu x{rd}, {imm}(x{rs1})"),
-            Sb { rs2, imm, rs1 } => write!(f, "sb x{rs2}, {imm}(x{rs1})"),
-            Sh { rs2, imm, rs1 } => write!(f, "sh x{rs2}, {imm}(x{rs1})"),
-            Sw { rs2, imm, rs1 } => write!(f, "sw x{rs2}, {imm}(x{rs1})"),
-            Sd { rs2, imm, rs1 } => write!(f, "sd x{rs2}, {imm}(x{rs1})"),
-            Beq { rs1, rs2, imm } => write!(f, "beq x{rs1}, x{rs2}, {imm}"),
-            Bne { rs1, rs2, imm } => write!(f, "bne x{rs1}, x{rs2}, {imm}"),
-            Blt { rs1, rs2, imm } => write!(f, "blt x{rs1}, x{rs2}, {imm}"),
-            Bge { rs1, rs2, imm } => write!(f, "bge x{rs1}, x{rs2}, {imm}"),
-            Bltu { rs1, rs2, imm } => write!(f, "bltu x{rs1}, x{rs2}, {imm}"),
-            Bgeu { rs1, rs2, imm } => write!(f, "bgeu x{rs1}, x{rs2}, {imm}"),
-            Jal { rd, imm } => write!(f, "jal x{rd}, {imm}"),
-            Jalr { rd, rs1, imm } => write!(f, "jalr x{rd}, {imm}(x{rs1})"),
-            Lui { rd, imm } => write!(f, "lui x{rd}, {:#x}", imm >> 12),
-            Auipc { rd, imm } => write!(f, "auipc x{rd}, {:#x}", imm >> 12),
-            Ecall => f.write_str("ecall"),
-            Ebreak => f.write_str("ebreak"),
-            Fence => f.write_str("fence"),
-        }
-    }
+    Csrrw {
+        rd: usize,
+        rs1: usize,
+        csr: usize,
+    },
+    Csrrs {
+        rd: usize,
+        rs1: usize,
+        csr: usize,
+    },
+    Csrrc {
+        rd: usize,
+        rs1: usize,
+        csr: usize,
+    },
+    Csrrwi {
+        rd: usize,
+        imm: u64,
+        csr: usize,
+    },
+    Csrrsi {
+        rd: usize,
+        imm: u64,
+        csr: usize,
+    },
+    Csrrci {
+        rd: usize,
+        imm: u64,
+        csr: usize,
+    },
 }
 
 fn rd_field(word: u32) -> usize {
@@ -494,6 +451,24 @@ impl From<u32> for Ifmt {
             rd: rd_field(value),
             rs1: rs1_field(value),
             imm: (value as i32 as i64) >> 20,
+        }
+    }
+}
+
+struct Csrfmt {
+    funct3: u32,
+    rd: usize,
+    rs1: usize,
+    csr: usize,
+}
+
+impl From<u32> for Csrfmt {
+    fn from(value: u32) -> Self {
+        Csrfmt {
+            funct3: funct3_field(value),
+            rd: rd_field(value),
+            rs1: rs1_field(value),
+            csr: (value >> 20) as usize,
         }
     }
 }
@@ -711,11 +686,15 @@ impl TryFrom<u32> for Instruction {
                     imm,
                 } = Ifmt::from(value);
                 match funct3 {
-                    0x0 => Ok(Addiw { rd, rs1, imm }),
+                    0x0 => Ok(Addiw {
+                        rd,
+                        rs1,
+                        imm: imm as i32,
+                    }),
                     0x1 => Ok(Slliw {
                         rd,
                         rs1,
-                        imm: (imm as u32) & 0x1f,
+                        imm: (imm as i32) & 0x1f,
                     }),
                     0x5 => match value >> 25 {
                         0x00 => Ok(Srliw {
@@ -726,7 +705,7 @@ impl TryFrom<u32> for Instruction {
                         0x20 => Ok(Sraiw {
                             rd,
                             rs1,
-                            imm: (imm as u32) & 0x1f,
+                            imm: (imm as i32) & 0x1f,
                         }),
                         _ => bail!("invalid shift imm:{:x}", imm),
                     },
@@ -816,22 +795,124 @@ impl TryFrom<u32> for Instruction {
             }
             // Environment
             0x73 => {
-                let Ifmt {
+                let Csrfmt {
                     funct3,
                     rd,
                     rs1,
-                    imm,
-                } = Ifmt::from(value);
-                if funct3 != 0x00 || rd != 0 || rs1 != 0 {
-                    bail!("invalid environment funct3:{:x}", funct3);
-                }
-                match imm {
-                    0x0 => Ok(Ecall),
-                    0x1 => Ok(Ebreak),
-                    _ => bail!("invalid environment imm:{:x}", imm),
+                    csr,
+                } = Csrfmt::from(value);
+                match funct3 {
+                    0x00 => {
+                        if rd != 0 || rs1 != 0 {
+                            bail!("invalid environment ir:{:x}", value);
+                        }
+                        match csr {
+                            0x0 => Ok(Ecall),
+                            0x1 => Ok(Ebreak),
+                            _ => bail!("invalid environment csr:{:x}", csr),
+                        }
+                    }
+                    0x1 => Ok(Csrrw { rd, rs1, csr }),
+                    0x2 => Ok(Csrrs { rd, rs1, csr }),
+                    0x3 => Ok(Csrrc { rd, rs1, csr }),
+                    0x5 => Ok(Csrrwi {
+                        rd,
+                        imm: rs1 as u64,
+                        csr,
+                    }),
+                    0x6 => Ok(Csrrsi {
+                        rd,
+                        imm: rs1 as u64,
+                        csr,
+                    }),
+                    0x7 => Ok(Csrrci {
+                        rd,
+                        imm: rs1 as u64,
+                        csr,
+                    }),
+                    _ => bail!("invlaid environment funct3:{:x}", funct3),
                 }
             }
             _ => bail!("invalid opcode:{:b}", opcode),
+        }
+    }
+}
+
+impl fmt::Display for Instruction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Instruction::*;
+        match self {
+            Add { rd, rs1, rs2 } => write!(f, "add x{rd}, x{rs1}, x{rs2}"),
+            Sub { rd, rs1, rs2 } => write!(f, "sub x{rd}, x{rs1}, x{rs2}"),
+            Xor { rd, rs1, rs2 } => write!(f, "xor x{rd}, x{rs1}, x{rs2}"),
+            Or { rd, rs1, rs2 } => write!(f, "or x{rd}, x{rs1}, x{rs2}"),
+            And { rd, rs1, rs2 } => write!(f, "and x{rd}, x{rs1}, x{rs2}"),
+            Sll { rd, rs1, rs2 } => write!(f, "sll x{rd}, x{rs1}, x{rs2}"),
+            Srl { rd, rs1, rs2 } => write!(f, "srl x{rd}, x{rs1}, x{rs2}"),
+            Sra { rd, rs1, rs2 } => write!(f, "sra x{rd}, x{rs1}, x{rs2}"),
+            Slt { rd, rs1, rs2 } => write!(f, "slt x{rd}, x{rs1}, x{rs2}"),
+            Sltu { rd, rs1, rs2 } => write!(f, "sltu x{rd}, x{rs1}, x{rs2}"),
+            Mul { rd, rs1, rs2 } => write!(f, "mul x{rd}, x{rs1}, x{rs2}"),
+            Mulh { rd, rs1, rs2 } => write!(f, "mulh x{rd}, x{rs1}, x{rs2}"),
+            Mulhsu { rd, rs1, rs2 } => write!(f, "mulhsu x{rd}, x{rs1}, x{rs2}"),
+            Mulhu { rd, rs1, rs2 } => write!(f, "mulhu x{rd}, x{rs1}, x{rs2}"),
+            Div { rd, rs1, rs2 } => write!(f, "div x{rd}, x{rs1}, x{rs2}"),
+            Divu { rd, rs1, rs2 } => write!(f, "divu x{rd}, x{rs1}, x{rs2}"),
+            Rem { rd, rs1, rs2 } => write!(f, "rem x{rd}, x{rs1}, x{rs2}"),
+            Remu { rd, rs1, rs2 } => write!(f, "remu x{rd}, x{rs1}, x{rs2}"),
+            Addw { rd, rs1, rs2 } => write!(f, "addw x{rd}, x{rs1}, x{rs2}"),
+            Subw { rd, rs1, rs2 } => write!(f, "subw x{rd}, x{rs1}, x{rs2}"),
+            Sllw { rd, rs1, rs2 } => write!(f, "sllw x{rd}, x{rs1}, x{rs2}"),
+            Srlw { rd, rs1, rs2 } => write!(f, "srlw x{rd}, x{rs1}, x{rs2}"),
+            Sraw { rd, rs1, rs2 } => write!(f, "sraw x{rd}, x{rs1}, x{rs2}"),
+            Mulw { rd, rs1, rs2 } => write!(f, "mulw x{rd}, x{rs1}, x{rs2}"),
+            Divw { rd, rs1, rs2 } => write!(f, "divw x{rd}, x{rs1}, x{rs2}"),
+            Divuw { rd, rs1, rs2 } => write!(f, "divuw x{rd}, x{rs1}, x{rs2}"),
+            Remw { rd, rs1, rs2 } => write!(f, "remw x{rd}, x{rs1}, x{rs2}"),
+            Remuw { rd, rs1, rs2 } => write!(f, "remuw x{rd}, x{rs1}, x{rs2}"),
+            Addi { rd, rs1, imm } => write!(f, "addi x{rd}, x{rs1}, {imm}"),
+            Xori { rd, rs1, imm } => write!(f, "xori x{rd}, x{rs1}, {imm}"),
+            Ori { rd, rs1, imm } => write!(f, "ori x{rd}, x{rs1}, {imm}"),
+            Andi { rd, rs1, imm } => write!(f, "andi x{rd}, x{rs1}, {imm}"),
+            Slli { rd, rs1, imm } => write!(f, "slli x{rd}, x{rs1}, {imm}"),
+            Srli { rd, rs1, imm } => write!(f, "srli x{rd}, x{rs1}, {imm}"),
+            Srai { rd, rs1, imm } => write!(f, "srai x{rd}, x{rs1}, {imm}"),
+            Slti { rd, rs1, imm } => write!(f, "slti x{rd}, x{rs1}, {imm}"),
+            Sltiu { rd, rs1, imm } => write!(f, "sltiu x{rd}, x{rs1}, {}", *imm as i32),
+            Addiw { rd, rs1, imm } => write!(f, "addiw x{rd}, x{rs1}, {}", *imm),
+            Slliw { rd, rs1, imm } => write!(f, "slliw x{rd}, x{rs1}, {}", *imm),
+            Srliw { rd, rs1, imm } => write!(f, "srliw x{rd}, x{rs1}, {}", *imm),
+            Sraiw { rd, rs1, imm } => write!(f, "sraiw x{rd}, x{rs1}, {}", *imm),
+            Lb { rd, rs1, imm } => write!(f, "lb x{rd}, {imm}(x{rs1})"),
+            Lh { rd, rs1, imm } => write!(f, "lh x{rd}, {imm}(x{rs1})"),
+            Lw { rd, rs1, imm } => write!(f, "lw x{rd}, {imm}(x{rs1})"),
+            Ld { rd, rs1, imm } => write!(f, "ld x{rd}, {imm}(x{rs1})"),
+            Lbu { rd, rs1, imm } => write!(f, "lbu x{rd}, {imm}(x{rs1})"),
+            Lhu { rd, rs1, imm } => write!(f, "lhu x{rd}, {imm}(x{rs1})"),
+            Lwu { rd, rs1, imm } => write!(f, "lwu x{rd}, {imm}(x{rs1})"),
+            Sb { rs2, imm, rs1 } => write!(f, "sb x{rs2}, {imm}(x{rs1})"),
+            Sh { rs2, imm, rs1 } => write!(f, "sh x{rs2}, {imm}(x{rs1})"),
+            Sw { rs2, imm, rs1 } => write!(f, "sw x{rs2}, {imm}(x{rs1})"),
+            Sd { rs2, imm, rs1 } => write!(f, "sd x{rs2}, {imm}(x{rs1})"),
+            Beq { rs1, rs2, imm } => write!(f, "beq x{rs1}, x{rs2}, {imm}"),
+            Bne { rs1, rs2, imm } => write!(f, "bne x{rs1}, x{rs2}, {imm}"),
+            Blt { rs1, rs2, imm } => write!(f, "blt x{rs1}, x{rs2}, {imm}"),
+            Bge { rs1, rs2, imm } => write!(f, "bge x{rs1}, x{rs2}, {imm}"),
+            Bltu { rs1, rs2, imm } => write!(f, "bltu x{rs1}, x{rs2}, {imm}"),
+            Bgeu { rs1, rs2, imm } => write!(f, "bgeu x{rs1}, x{rs2}, {imm}"),
+            Jal { rd, imm } => write!(f, "jal x{rd}, {imm}"),
+            Jalr { rd, rs1, imm } => write!(f, "jalr x{rd}, {imm}(x{rs1})"),
+            Lui { rd, imm } => write!(f, "lui x{rd}, {:#x}", imm >> 12),
+            Auipc { rd, imm } => write!(f, "auipc x{rd}, {:#x}", imm >> 12),
+            Ecall => f.write_str("ecall"),
+            Ebreak => f.write_str("ebreak"),
+            Fence => f.write_str("fence"),
+            Csrrw { rd, rs1, csr } => write!(f, "csrrw x{rd}, x{csr}, x{rs1}"),
+            Csrrs { rd, rs1, csr } => write!(f, "csrrs x{rd}, x{csr}, x{rs1}"),
+            Csrrc { rd, rs1, csr } => write!(f, "csrrc x{rd}, x{csr}, x{rs1}"),
+            Csrrwi { rd, imm, csr } => write!(f, "csrrwi x{rd}, x{csr}, {:x}", imm),
+            Csrrsi { rd, imm, csr } => write!(f, "csrrsi x{rd}, x{csr}, {:x}", imm),
+            Csrrci { rd, imm, csr } => write!(f, "csrrci x{rd}, x{csr}, {:x}", imm),
         }
     }
 }
@@ -897,6 +978,15 @@ impl From<Instruction> for u32 {
                 | 0x6f
         }
 
+        fn encode_csr(opcode: u32, funct3: u32, rd: usize, rs1: usize, csr: usize) -> u32 {
+            let csr = csr as u32 & 0xfff;
+            ((csr & 0xfff) << 20)
+                | ((rs1 as u32 & 0x1f) << 15)
+                | (funct3 << 12)
+                | ((rd as u32 & 0x1f) << 7)
+                | opcode
+        }
+
         match inst {
             Add { rd, rs1, rs2 } => encode_r(0x33, 0, rs2, rs1, 0, rd),
             Sub { rd, rs1, rs2 } => encode_r(0x33, 0x20, rs2, rs1, 0, rd),
@@ -935,7 +1025,7 @@ impl From<Instruction> for u32 {
             Srai { rd, rs1, imm } => encode_i(0x13, 5, rd, rs1, 0x400 | imm as i64 & 0x3f),
             Slti { rd, rs1, imm } => encode_i(0x13, 2, rd, rs1, imm),
             Sltiu { rd, rs1, imm } => encode_i(0x13, 3, rd, rs1, imm as i64),
-            Addiw { rd, rs1, imm } => encode_i(0x1b, 0, rd, rs1, imm),
+            Addiw { rd, rs1, imm } => encode_i(0x1b, 0, rd, rs1, imm as i64),
             Slliw { rd, rs1, imm } => encode_i(0x1b, 1, rd, rs1, imm as i64),
             Srliw { rd, rs1, imm } => encode_i(0x1b, 5, rd, rs1, imm as i64),
             Sraiw { rd, rs1, imm } => encode_i(0x1b, 5, rd, rs1, 0x400 | imm as i64 & 0x1f),
@@ -963,6 +1053,12 @@ impl From<Instruction> for u32 {
             Ecall => 0x0000_0073,
             Ebreak => 0x0010_0073,
             Fence => 0x0000_000f,
+            Csrrw { rd, rs1, csr } => encode_csr(0x73, 0x1, rd, rs1, csr),
+            Csrrs { rd, rs1, csr } => encode_csr(0x73, 0x2, rd, rs1, csr),
+            Csrrc { rd, rs1, csr } => encode_csr(0x73, 0x3, rd, rs1, csr),
+            Csrrwi { rd, imm, csr } => encode_csr(0x73, 0x5, rd, imm as usize, csr),
+            Csrrsi { rd, imm, csr } => encode_csr(0x73, 0x6, rd, imm as usize, csr),
+            Csrrci { rd, imm, csr } => encode_csr(0x73, 0x7, rd, imm as usize, csr),
         }
     }
 }
