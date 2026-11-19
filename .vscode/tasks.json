@@ -1,0 +1,12 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Generate Test Coverage",
+      "type": "shell",
+      "command": "cargo llvm-cov --lcov --output-path lcov.info",
+      "group": "test",
+      "problemMatcher": []
+    }
+  ]
+}

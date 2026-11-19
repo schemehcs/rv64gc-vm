@@ -793,6 +793,65 @@ mod parser_tests {
     }
 
     #[test]
+    fn decodes_andw() {
+        assert_round_trip(
+            0b0000000_00011_00010_000_00001_0111011,
+            Addw {
+                rd: 1,
+                rs1: 2,
+                rs2: 3,
+            },
+        );
+    }
+
+    #[test]
+    fn decodes_subw() {
+        assert_round_trip(
+            0b0100000_00011_00010_000_00001_0111011,
+            Subw {
+                rd: 1,
+                rs1: 2,
+                rs2: 3,
+            },
+        );
+    }
+    #[test]
+    fn decodes_sllw() {
+        assert_round_trip(
+            0b0000000_00011_00010_001_00001_0111011,
+            Sllw {
+                rd: 1,
+                rs1: 2,
+                rs2: 3,
+            },
+        );
+    }
+
+    #[test]
+    fn decodes_srlw() {
+        assert_round_trip(
+            0b0000000_00011_00010_101_00001_0111011,
+            Srlw {
+                rd: 1,
+                rs1: 2,
+                rs2: 3,
+            },
+        );
+    }
+
+    #[test]
+    fn decodes_sraw() {
+        assert_round_trip(
+            0b0100000_00011_00010_101_00001_0111011,
+            Sraw {
+                rd: 1,
+                rs1: 2,
+                rs2: 3,
+            },
+        );
+    }
+
+    #[test]
     fn decodes_addi() {
         assert_round_trip(
             0b1000_0000_0000_00010_000_00001_0010011,
