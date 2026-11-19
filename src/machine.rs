@@ -1,6 +1,10 @@
-use crate::inst::Instruction;
+mod instruction;
+mod memory;
+
 use anyhow::{Ok, bail};
-use std::ops::{Range, Shl, Shr};
+use instruction::Instruction;
+use memory::Memory;
+use std::ops::{Shl, Shr};
 
 pub enum RetCode {
     Cont,
@@ -13,69 +17,6 @@ pub struct Machine {
     pc: usize,
 }
 
-pub struct Memory {
-    ram: Vec<u8>,
-}
-
-impl Memory {
-    pub fn new(size: usize) -> Self {
-        Self { ram: vec![0; size] }
-    }
-
-    pub fn guard_addr(&self, addr: usize) -> anyhow::Result<()> {
-        if addr >= self.ram.len() {
-            bail!("memory addr out of range:{}", addr)
-        }
-        Ok(())
-    }
-
-    pub fn slice(&self, addr: usize, len: usize) -> anyhow::Result<&[u8]> {
-        self.guard_addr(addr + len - 1)?;
-        Ok(&self.ram[addr..addr + len])
-    }
-
-    #[allow(dead_code)]
-    pub fn slice_range(&self, range: Range<usize>) -> anyhow::Result<&[u8]> {
-        self.guard_addr(range.end)?;
-        Ok(&self.ram[range])
-    }
-
-    pub fn slice_mut(&mut self, addr: usize, len: usize) -> anyhow::Result<&mut [u8]> {
-        self.guard_addr(addr + len - 1)?;
-        Ok(&mut self.ram[addr..addr + len])
-    }
-
-    pub fn write_slice(&mut self, addr: usize, slice: &[u8]) -> anyhow::Result<()> {
-        let sl_len = slice.len();
-        self.guard_addr(addr + sl_len - 1)?;
-        self.ram[addr..addr + sl_len].copy_from_slice(slice);
-        Ok(())
-    }
-
-    pub fn read_u8(&self, addr: usize) -> anyhow::Result<u8> {
-        self.guard_addr(addr)?;
-        Ok(self.ram[addr])
-    }
-
-    pub fn write_u8(&mut self, addr: usize, byte: u8) -> anyhow::Result<()> {
-        self.guard_addr(addr)?;
-        self.ram[addr] = byte;
-        Ok(())
-    }
-
-    pub fn read_u16(&self, addr: usize) -> anyhow::Result<u16> {
-        Ok(u16::from_le_bytes(self.slice(addr, 2)?.try_into()?))
-    }
-
-    pub fn read_u32(&self, addr: usize) -> anyhow::Result<u32> {
-        Ok(u32::from_le_bytes(self.slice(addr, 4)?.try_into()?))
-    }
-
-    pub fn read_u64(&self, addr: usize) -> anyhow::Result<u64> {
-        Ok(u64::from_le_bytes(self.slice(addr, 8)?.try_into()?))
-    }
-}
-
 impl Machine {
     pub fn new(memory_size: usize) -> Self {
         Self {
@@ -85,9 +26,8 @@ impl Machine {
         }
     }
 
-    pub fn load_bin(&mut self, bin: &[u8]) -> anyhow::Result<()> {
-        self.memory.slice_mut(0, bin.len())?.copy_from_slice(bin);
-        Ok(())
+    pub fn load_bin(&mut self, addr: usize, bin: &[u8]) -> anyhow::Result<()> {
+        self.memory.store_slice(addr, bin)
     }
 
     fn rr(&self, xx: usize) -> i64 {
@@ -133,12 +73,12 @@ impl Machine {
         self.rru(rs1).wrapping_add_signed(imm) as usize
     }
 
-    fn parse_inst(&self) -> anyhow::Result<Instruction> {
-        let word = self.memory.read_u32(self.pc)?;
+    fn parse_ir(&self) -> anyhow::Result<Instruction> {
+        let word = self.memory.load_u32(self.pc)?;
         Instruction::try_from(word)
     }
 
-    pub fn exec_inst(&mut self, inst: &Instruction) -> anyhow::Result<RetCode> {
+    pub fn execute_ir(&mut self, inst: &Instruction) -> anyhow::Result<RetCode> {
         use Instruction::*;
         match inst {
             Add { rd, rs1, rs2 } => {
@@ -349,65 +289,65 @@ impl Machine {
             }
             Lb { rd, rs1, imm } => {
                 let addr = self.effective_addr(*rs1, *imm);
-                let byte = self.memory.read_u8(addr)?;
+                let byte = self.memory.load_u8(addr)?;
                 self.wr(*rd, byte as i8 as i64);
                 self.advance_pc();
             }
             Lh { rd, rs1, imm } => {
                 let addr = self.effective_addr(*rs1, *imm);
-                let hw = self.memory.read_u16(addr)?;
+                let hw = self.memory.load_u16(addr)?;
                 self.wr(*rd, hw as i16 as i64);
                 self.advance_pc();
             }
             Lw { rd, rs1, imm } => {
                 let addr = self.effective_addr(*rs1, *imm);
-                let wd = self.memory.read_u32(addr)?;
+                let wd = self.memory.load_u32(addr)?;
                 self.wr(*rd, wd as i32 as i64);
                 self.advance_pc();
             }
             Ld { rd, rs1, imm } => {
                 let addr = self.effective_addr(*rs1, *imm);
-                let dd = self.memory.read_u64(addr)?;
+                let dd = self.memory.load_u64(addr)?;
                 self.wru(*rd, dd);
                 self.advance_pc();
             }
             Lbu { rd, rs1, imm } => {
                 let addr = self.effective_addr(*rs1, *imm);
-                self.wru(*rd, self.memory.read_u8(addr)? as u64);
+                self.wru(*rd, self.memory.load_u8(addr)? as u64);
                 self.advance_pc();
             }
             Lhu { rd, rs1, imm } => {
                 let addr = self.effective_addr(*rs1, *imm);
-                self.wru(*rd, self.memory.read_u16(addr)? as u64);
+                self.wru(*rd, self.memory.load_u16(addr)? as u64);
                 self.advance_pc();
             }
             Lwu { rd, rs1, imm } => {
                 let addr = self.effective_addr(*rs1, *imm);
-                self.wru(*rd, self.memory.read_u32(addr)? as u64);
+                self.wru(*rd, self.memory.load_u32(addr)? as u64);
                 self.advance_pc();
             }
             Sb { rs2, imm, rs1 } => {
                 let addr = self.effective_addr(*rs1, *imm);
                 let byte = self.rr(*rs2) as u8;
-                self.memory.write_u8(addr, byte)?;
+                self.memory.store_u8(addr, byte)?;
                 self.advance_pc();
             }
             Sh { rs2, imm, rs1 } => {
                 let addr = self.effective_addr(*rs1, *imm);
                 let val = self.rr(*rs2) as u16;
-                self.memory.write_slice(addr, &val.to_le_bytes())?;
+                self.memory.store_slice(addr, &val.to_le_bytes())?;
                 self.advance_pc();
             }
             Sw { rs2, imm, rs1 } => {
                 let addr = self.effective_addr(*rs1, *imm);
                 let val = self.rr(*rs2) as u32;
-                self.memory.write_slice(addr, &val.to_le_bytes())?;
+                self.memory.store_slice(addr, &val.to_le_bytes())?;
                 self.advance_pc();
             }
             Sd { rs2, imm, rs1 } => {
                 let addr = self.effective_addr(*rs1, *imm);
                 let val = self.rr(*rs2);
-                self.memory.write_slice(addr, &val.to_le_bytes())?;
+                self.memory.store_slice(addr, &val.to_le_bytes())?;
                 self.advance_pc();
             }
             Beq { rs1, rs2, imm } => {
@@ -478,7 +418,7 @@ impl Machine {
     }
 
     pub fn step(&mut self) -> anyhow::Result<RetCode> {
-        self.exec_inst(&self.parse_inst()?)
+        self.execute_ir(&self.parse_ir()?)
     }
 
     pub fn run(&mut self) -> anyhow::Result<()> {
@@ -507,7 +447,7 @@ impl Machine {
 }
 
 #[cfg(test)]
-mod inst_tests {
+mod execute_ir_tests {
     use super::{Instruction::*, Machine};
 
     #[test]
@@ -517,14 +457,14 @@ mod inst_tests {
         machine.register[2] = 0x1234_5678;
 
         machine
-            .exec_inst(&Sh {
+            .execute_ir(&Sh {
                 rs2: 2,
                 imm: 0,
                 rs1: 1,
             })
             .unwrap();
 
-        assert_eq!(machine.memory.slice_range(4..6).unwrap(), &[0x78, 0x56]);
+        assert_eq!(machine.memory.slice(4, 2).unwrap(), &[0x78, 0x56]);
         assert_eq!(machine.pc, 4);
     }
 
@@ -535,7 +475,7 @@ mod inst_tests {
         machine.register[2] = 0x1234_5678;
 
         machine
-            .exec_inst(&Sw {
+            .execute_ir(&Sw {
                 rs2: 2,
                 imm: 4,
                 rs1: 1,
@@ -543,7 +483,7 @@ mod inst_tests {
             .unwrap();
 
         assert_eq!(
-            &machine.memory.slice_range(8..12).unwrap(),
+            &machine.memory.slice(8, 4).unwrap(),
             &[0x78, 0x56, 0x34, 0x12]
         );
         assert_eq!(machine.pc, 4);
@@ -555,7 +495,7 @@ mod inst_tests {
         machine.register[1] = 0x8000_0000_0000_0001_u64 as i64;
         machine.register[2] = 0x41;
         machine
-            .exec_inst(&Sll {
+            .execute_ir(&Sll {
                 rd: 3,
                 rs1: 1,
                 rs2: 2,
@@ -570,7 +510,7 @@ mod inst_tests {
         machine.register[1] = 0x8000_0000_0000_0001_u64 as i64;
         machine.register[2] = 0x41;
         machine
-            .exec_inst(&Srl {
+            .execute_ir(&Srl {
                 rd: 4,
                 rs1: 1,
                 rs2: 2,
@@ -585,7 +525,7 @@ mod inst_tests {
         machine.register[1] = 0x8000_0000_0000_0001_u64 as i64;
         machine.register[2] = 0x41;
         machine
-            .exec_inst(&Sra {
+            .execute_ir(&Sra {
                 rd: 5,
                 rs1: 1,
                 rs2: 2,
@@ -600,7 +540,7 @@ mod inst_tests {
         machine.register[1] = 101;
 
         machine
-            .exec_inst(&Jalr {
+            .execute_ir(&Jalr {
                 rd: 1,
                 rs1: 1,
                 imm: 2,
@@ -618,14 +558,14 @@ mod inst_tests {
         machine.register[2] = 0x5a;
 
         machine
-            .exec_inst(&Sb {
+            .execute_ir(&Sb {
                 rs2: 2,
                 imm: 1,
                 rs1: 1,
             })
             .unwrap();
 
-        assert_eq!(machine.memory.read_u8(0).unwrap(), 0x5a);
+        assert_eq!(machine.memory.load_u8(0).unwrap(), 0x5a);
     }
 
     #[test]
@@ -636,7 +576,7 @@ mod inst_tests {
 
         assert!(
             machine
-                .exec_inst(&Sh {
+                .execute_ir(&Sh {
                     rs2: 2,
                     imm: 0,
                     rs1: 1
@@ -652,7 +592,7 @@ mod inst_tests {
         machine.register[1] = 3;
         assert!(
             machine
-                .exec_inst(&Lw {
+                .execute_ir(&Lw {
                     rd: 3,
                     rs1: 1,
                     imm: 0
@@ -666,73 +606,13 @@ mod inst_tests {
     fn instruction_fetch_out_of_bounds_returns_error() {
         let mut machine = Machine::new(4);
         machine.pc = 4;
-        assert!(machine.parse_inst().is_err());
+        assert!(machine.parse_ir().is_err());
     }
 
     #[test]
     fn fence_is_a_supported_no_op() {
         let mut machine = Machine::new(4);
-        machine.exec_inst(&Fence).unwrap();
+        machine.execute_ir(&Fence).unwrap();
         assert_eq!(machine.pc, 4);
-    }
-}
-
-#[cfg(test)]
-mod display_tests {
-    use super::Instruction::*;
-
-    #[test]
-    fn formats_riscv_assembly_operands() {
-        assert_eq!(
-            Add {
-                rd: 1,
-                rs1: 2,
-                rs2: 3
-            }
-            .to_string(),
-            "add x1, x2, x3"
-        );
-        assert_eq!(
-            Lw {
-                rd: 5,
-                rs1: 6,
-                imm: -12
-            }
-            .to_string(),
-            "lw x5, -12(x6)"
-        );
-        assert_eq!(
-            Sw {
-                rs2: 7,
-                imm: 16,
-                rs1: 8
-            }
-            .to_string(),
-            "sw x7, 16(x8)"
-        );
-        assert_eq!(
-            Sltiu {
-                rd: 9,
-                rs1: 10,
-                imm: 0xffff_f800
-            }
-            .to_string(),
-            "sltiu x9, x10, -2048"
-        );
-        assert_eq!(
-            Lui {
-                rd: 11,
-                imm: 0x1234_5000
-            }
-            .to_string(),
-            "lui x11, 0x12345"
-        );
-        assert_eq!(Ecall.to_string(), "ecall");
-    }
-
-    #[test]
-    fn displays_decoded_instructions() {
-        let instruction = super::Instruction::try_from(0xfe1f_f0ef).unwrap();
-        assert_eq!(instruction.to_string(), "jal x1, -32");
     }
 }

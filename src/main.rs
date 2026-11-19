@@ -1,10 +1,9 @@
-mod inst;
-mod vm;
+mod machine;
 
 use anyhow::Ok;
 use clap::Parser;
+use machine::Machine;
 use std::path::PathBuf;
-use vm::Machine;
 
 #[derive(Parser)]
 #[command(version, about, long_about=None)]
@@ -18,7 +17,7 @@ fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let bin = std::fs::read(cli.path)?;
     let mut machine = Machine::new(2 << 20);
-    machine.load_bin(&bin)?;
+    machine.load_bin(0, &bin)?;
     machine.run()?;
     machine.debug();
     Ok(())
