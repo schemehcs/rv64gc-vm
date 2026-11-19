@@ -16,13 +16,35 @@ impl Memory {
     }
 
     pub fn slice(&self, addr: usize, len: usize) -> anyhow::Result<&[u8]> {
-        self.guard_addr(addr + len - 1)?;
+        if len == 0 {
+            if addr > self.ram.len() {
+                bail!("memory addr out of range:{}", addr)
+            }
+            return Ok(&self.ram[addr..addr]);
+        }
+        let end = addr.checked_add(len).ok_or_else(|| {
+            anyhow::anyhow!("memory range out of range: addr={}, len={}", addr, len)
+        })?;
+        if end > self.ram.len() {
+            bail!("memory addr out of range:{}", addr)
+        }
         Ok(&self.ram[addr..addr + len])
     }
 
     pub fn store_slice(&mut self, addr: usize, slice: &[u8]) -> anyhow::Result<()> {
         let sl_len = slice.len();
-        self.guard_addr(addr + sl_len - 1)?;
+        if sl_len == 0 {
+            if addr > self.ram.len() {
+                bail!("memory addr out of range:{}", addr)
+            }
+            return Ok(());
+        }
+        let end = addr.checked_add(sl_len).ok_or_else(|| {
+            anyhow::anyhow!("memory range out of range: addr={}, len={}", addr, sl_len)
+        })?;
+        if end > self.ram.len() {
+            bail!("memory addr out of range:{}", addr)
+        }
         self.ram[addr..addr + sl_len].copy_from_slice(slice);
         Ok(())
     }

@@ -793,7 +793,15 @@ impl TryFrom<u32> for Instruction {
             }
             // Jump And Link Reg - I FMT
             0x67 => {
-                let Ifmt { rd, rs1, imm, .. } = Ifmt::from(value);
+                let Ifmt {
+                    funct3,
+                    rd,
+                    rs1,
+                    imm,
+                } = Ifmt::from(value);
+                if funct3 != 0x00 {
+                    bail!("invalid jalr funct3:{:x}", funct3);
+                }
                 Ok(Jalr { rd, rs1, imm })
             }
             // Load Upper Imm - U FMT
@@ -1485,6 +1493,11 @@ mod parser_tests {
     #[test]
     fn rejects_ecall_with_nonzero_rd() {
         assert!(Instruction::try_from(0x0000_00f3).is_err());
+    }
+
+    #[test]
+    fn rejects_jalr_with_nonzero_funct3() {
+        assert!(Instruction::try_from(0x0000_1067).is_err());
     }
 
     #[test]

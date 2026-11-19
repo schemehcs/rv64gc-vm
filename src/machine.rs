@@ -73,6 +73,46 @@ impl Machine {
         self.rru(rs1).wrapping_add_signed(imm) as usize
     }
 
+    fn div_i64(dividend: i64, divisor: i64) -> i64 {
+        if divisor == 0 {
+            -1
+        } else if dividend == i64::MIN && divisor == -1 {
+            i64::MIN
+        } else {
+            dividend / divisor
+        }
+    }
+
+    fn rem_i64(dividend: i64, divisor: i64) -> i64 {
+        if divisor == 0 {
+            dividend
+        } else if dividend == i64::MIN && divisor == -1 {
+            0
+        } else {
+            dividend % divisor
+        }
+    }
+
+    fn div_i32(dividend: i32, divisor: i32) -> i32 {
+        if divisor == 0 {
+            -1
+        } else if dividend == i32::MIN && divisor == -1 {
+            i32::MIN
+        } else {
+            dividend / divisor
+        }
+    }
+
+    fn rem_i32(dividend: i32, divisor: i32) -> i32 {
+        if divisor == 0 {
+            dividend
+        } else if dividend == i32::MIN && divisor == -1 {
+            0
+        } else {
+            dividend % divisor
+        }
+    }
+
     fn parse_ir(&self) -> anyhow::Result<Instruction> {
         let word = self.memory.load_u32(self.pc)?;
         Instruction::try_from(word)
@@ -158,22 +198,32 @@ impl Machine {
                 self.advance_pc();
             }
             Div { rd, rs1, rs2 } => {
-                let rd_val = self.rr(*rs1).wrapping_div(self.rr(*rs2));
+                let rd_val = Self::div_i64(self.rr(*rs1), self.rr(*rs2));
                 self.wr(*rd, rd_val);
                 self.advance_pc();
             }
             Divu { rd, rs1, rs2 } => {
-                let rd_val = self.rru(*rs1) / self.rru(*rs2);
+                let divisor = self.rru(*rs2);
+                let rd_val = if divisor == 0 {
+                    u64::MAX
+                } else {
+                    self.rru(*rs1) / divisor
+                };
                 self.wru(*rd, rd_val);
                 self.advance_pc();
             }
             Rem { rd, rs1, rs2 } => {
-                let rd_val = self.rr(*rs1).wrapping_rem(self.rr(*rs2));
+                let rd_val = Self::rem_i64(self.rr(*rs1), self.rr(*rs2));
                 self.wr(*rd, rd_val);
                 self.advance_pc();
             }
             Remu { rd, rs1, rs2 } => {
-                let rd_val = self.rru(*rs1) % self.rru(*rs2);
+                let divisor = self.rru(*rs2);
+                let rd_val = if divisor == 0 {
+                    self.rru(*rs1)
+                } else {
+                    self.rru(*rs1) % divisor
+                };
                 self.wru(*rd, rd_val);
                 self.advance_pc();
             }
@@ -208,22 +258,32 @@ impl Machine {
                 self.advance_pc();
             }
             Divw { rd, rs1, rs2 } => {
-                let rd_val = self.rrw(*rs1).wrapping_div(self.rrw(*rs2));
+                let rd_val = Self::div_i32(self.rrw(*rs1), self.rrw(*rs2));
                 self.wrw(*rd, rd_val);
                 self.advance_pc();
             }
             Divuw { rd, rs1, rs2 } => {
-                let rd_val = self.rruw(*rs1) / self.rruw(*rs2);
+                let divisor = self.rruw(*rs2);
+                let rd_val = if divisor == 0 {
+                    u32::MAX
+                } else {
+                    self.rruw(*rs1) / divisor
+                };
                 self.wrw(*rd, rd_val as i32);
                 self.advance_pc();
             }
             Remw { rd, rs1, rs2 } => {
-                let rd_val = self.rrw(*rs1).wrapping_rem(self.rrw(*rs2));
+                let rd_val = Self::rem_i32(self.rrw(*rs1), self.rrw(*rs2));
                 self.wrw(*rd, rd_val);
                 self.advance_pc();
             }
             Remuw { rd, rs1, rs2 } => {
-                let rd_val = self.rruw(*rs1).wrapping_rem(self.rruw(*rs2));
+                let divisor = self.rruw(*rs2);
+                let rd_val = if divisor == 0 {
+                    self.rruw(*rs1)
+                } else {
+                    self.rruw(*rs1) % divisor
+                };
                 self.wrw(*rd, rd_val as i32);
                 self.advance_pc();
             }
@@ -607,6 +667,100 @@ mod execute_ir_tests {
         let mut machine = Machine::new(4);
         machine.pc = 4;
         assert!(machine.parse_ir().is_err());
+    }
+
+    #[test]
+    fn signed_division_handles_zero_and_overflow() {
+        let mut machine = Machine::new(16);
+        machine.register[1] = i64::MIN;
+        machine.register[2] = -1;
+
+        machine
+            .execute_ir(&Div {
+                rd: 3,
+                rs1: 1,
+                rs2: 2,
+            })
+            .unwrap();
+        assert_eq!(machine.rr(3), i64::MIN);
+
+        machine.register[2] = 0;
+        machine
+            .execute_ir(&Div {
+                rd: 4,
+                rs1: 1,
+                rs2: 2,
+            })
+            .unwrap();
+        assert_eq!(machine.rr(4), -1);
+
+        machine
+            .execute_ir(&Rem {
+                rd: 5,
+                rs1: 1,
+                rs2: 2,
+            })
+            .unwrap();
+        assert_eq!(machine.rr(5), i64::MIN);
+    }
+
+    #[test]
+    fn unsigned_division_handles_zero() {
+        let mut machine = Machine::new(16);
+        machine.register[1] = 7;
+        machine.register[2] = 0;
+
+        machine
+            .execute_ir(&Divu {
+                rd: 3,
+                rs1: 1,
+                rs2: 2,
+            })
+            .unwrap();
+        assert_eq!(machine.rru(3), u64::MAX);
+
+        machine
+            .execute_ir(&Remu {
+                rd: 4,
+                rs1: 1,
+                rs2: 2,
+            })
+            .unwrap();
+        assert_eq!(machine.rru(4), 7);
+    }
+
+    #[test]
+    fn word_division_handles_zero_and_overflow() {
+        let mut machine = Machine::new(16);
+        machine.register[1] = i32::MIN as i64;
+        machine.register[2] = -1;
+
+        machine
+            .execute_ir(&Divw {
+                rd: 3,
+                rs1: 1,
+                rs2: 2,
+            })
+            .unwrap();
+        assert_eq!(machine.rrw(3), i32::MIN);
+
+        machine.register[2] = 0;
+        machine
+            .execute_ir(&Remw {
+                rd: 4,
+                rs1: 1,
+                rs2: 2,
+            })
+            .unwrap();
+        assert_eq!(machine.rrw(4), i32::MIN);
+    }
+
+    #[test]
+    fn memory_slice_rejects_overflow_and_allows_empty_at_end() {
+        let mut memory = super::Memory::new(4);
+        assert!(memory.slice(usize::MAX, 1).is_err());
+        assert!(memory.store_slice(usize::MAX, &[]).is_err());
+        assert!(memory.slice(4, 0).is_ok());
     }
 
     #[test]
