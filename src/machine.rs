@@ -756,6 +756,56 @@ mod execute_ir_tests {
     }
 
     #[test]
+    fn word_division_by_zero_returns_specified_values() {
+        let mut machine = Machine::new(16);
+        machine.register[1] = 0x1234_5678_8000_0007;
+        machine.register[2] = 0;
+
+        machine
+            .execute_ir(&Divw {
+                rd: 3,
+                rs1: 1,
+                rs2: 2,
+            })
+            .unwrap();
+        assert_eq!(machine.rr(3), -1);
+
+        machine
+            .execute_ir(&Divuw {
+                rd: 4,
+                rs1: 1,
+                rs2: 2,
+            })
+            .unwrap();
+        assert_eq!(machine.rr(4), -1);
+
+        machine
+            .execute_ir(&Remuw {
+                rd: 5,
+                rs1: 1,
+                rs2: 2,
+            })
+            .unwrap();
+        assert_eq!(machine.rr(5), 0xffff_ffff_8000_0007_u64 as i64);
+    }
+
+    #[test]
+    fn word_remainder_overflow_returns_zero() {
+        let mut machine = Machine::new(16);
+        machine.register[1] = i32::MIN as i64;
+        machine.register[2] = -1;
+
+        machine
+            .execute_ir(&Remw {
+                rd: 3,
+                rs1: 1,
+                rs2: 2,
+            })
+            .unwrap();
+        assert_eq!(machine.rr(3), 0);
+    }
+
+    #[test]
     fn memory_slice_rejects_overflow_and_allows_empty_at_end() {
         let mut memory = super::Memory::new(4);
         assert!(memory.slice(usize::MAX, 1).is_err());
