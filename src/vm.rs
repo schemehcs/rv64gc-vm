@@ -94,8 +94,16 @@ impl Machine {
         self.register[xx]
     }
 
+    fn rrw(&self, xx: usize) -> i32 {
+        self.register[xx] as i32
+    }
+
     fn rru(&self, xx: usize) -> u64 {
         self.register[xx] as u64
+    }
+
+    fn rruw(&self, xx: usize) -> u32 {
+        self.register[xx] as u32
     }
 
     fn wr(&mut self, xx: usize, val: i64) {
@@ -103,6 +111,10 @@ impl Machine {
             return;
         }
         self.register[xx] = val;
+    }
+
+    fn wrw(&mut self, xx: usize, val: i32) {
+        self.wr(xx, val as i64);
     }
 
     fn wru(&mut self, xx: usize, val: u64) {
@@ -177,35 +189,102 @@ impl Machine {
                 }
                 self.advance_pc();
             }
+            Mul { rd, rs1, rs2 } => {
+                let rs1_val = self.rr(*rs1);
+                let rs2_val = self.rr(*rs2);
+                let rd_val = rs1_val.wrapping_mul(rs2_val);
+                self.wr(*rd, rd_val);
+                self.advance_pc();
+            }
+            Mulh { rd, rs1, rs2 } => {
+                let rs1_val = self.rr(*rs1) as i128;
+                let rs2_val = self.rr(*rs2) as i128;
+                let rd_val = ((rs1_val * rs2_val) >> 64) as i64;
+                self.wr(*rd, rd_val);
+                self.advance_pc();
+            }
+            Mulhsu { rd, rs1, rs2 } => {
+                let rs1_val = self.rr(*rs1) as i128;
+                let rs2_val = self.rru(*rs2) as i128;
+                let rd_val = ((rs1_val * rs2_val) >> 64) as i64;
+                self.wr(*rd, rd_val);
+                self.advance_pc();
+            }
+            Mulhu { rd, rs1, rs2 } => {
+                let rs1_val = self.rru(*rs1) as u128;
+                let rs2_val = self.rru(*rs2) as u128;
+                let rd_val = ((rs1_val * rs2_val) >> 64) as u64;
+                self.wru(*rd, rd_val);
+                self.advance_pc();
+            }
+            Div { rd, rs1, rs2 } => {
+                let rd_val = self.rr(*rs1).wrapping_div(self.rr(*rs2));
+                self.wr(*rd, rd_val);
+                self.advance_pc();
+            }
+            Divu { rd, rs1, rs2 } => {
+                let rd_val = self.rru(*rs1) / self.rru(*rs2);
+                self.wru(*rd, rd_val);
+                self.advance_pc();
+            }
+            Rem { rd, rs1, rs2 } => {
+                let rd_val = self.rr(*rs1).wrapping_rem(self.rr(*rs2));
+                self.wr(*rd, rd_val);
+                self.advance_pc();
+            }
+            Remu { rd, rs1, rs2 } => {
+                let rd_val = self.rru(*rs1) % self.rru(*rs2);
+                self.wru(*rd, rd_val);
+                self.advance_pc();
+            }
             Addw { rd, rs1, rs2 } => {
-                let rd_val = (self.rr(*rs1) as i32).wrapping_add(self.rr(*rs2) as i32);
-                self.wr(*rd, rd_val as i64);
+                let rd_val = self.rrw(*rs1).wrapping_add(self.rrw(*rs2));
+                self.wrw(*rd, rd_val);
                 self.advance_pc();
             }
             Subw { rd, rs1, rs2 } => {
-                let rd_val = (self.rr(*rs1) as i32).wrapping_sub(self.rr(*rs2) as i32);
-                self.wr(*rd, rd_val as i64);
+                let rd_val = self.rrw(*rs1).wrapping_sub(self.rrw(*rs2));
+                self.wrw(*rd, rd_val);
                 self.advance_pc();
             }
             Sllw { rd, rs1, rs2 } => {
-                let rs1_val = self.rr(*rs1) as i32;
-                let rs2_val = (self.rr(*rs2) & 0x1f) as i32;
-                let rd_val = rs1_val.shl(rs2_val);
-                self.wr(*rd, rd_val as i64);
+                let rd_val = self.rrw(*rs1).shl(self.rrw(*rs2) & 0x1f);
+                self.wrw(*rd, rd_val);
                 self.advance_pc();
             }
             Srlw { rd, rs1, rs2 } => {
-                let rs1_val = self.rr(*rs1) as u32;
-                let rs2_val = (self.rr(*rs2) & 0x1f) as u32;
-                let rd_val = rs1_val.shr(rs2_val);
-                self.wr(*rd, rd_val as i32 as i64);
+                let rd_val = self.rruw(*rs1).shr(self.rruw(*rs2) & 0x1f);
+                self.wrw(*rd, rd_val as i32);
                 self.advance_pc();
             }
             Sraw { rd, rs1, rs2 } => {
-                let rs1_val = self.rr(*rs1) as i32;
-                let rs2_val = (self.rr(*rs2) & 0x1f) as i32;
-                let rd_val = rs1_val.shr(rs2_val);
-                self.wr(*rd, rd_val as i64);
+                let rd_val = self.rrw(*rs1).shr(self.rrw(*rs2) & 0x1f);
+                self.wrw(*rd, rd_val);
+                self.advance_pc();
+            }
+            Mulw { rd, rs1, rs2 } => {
+                let rd_val = self.rrw(*rs1).wrapping_mul(self.rrw(*rs2));
+                self.wrw(*rd, rd_val);
+                self.advance_pc();
+            }
+            Divw { rd, rs1, rs2 } => {
+                let rd_val = self.rrw(*rs1).wrapping_div(self.rrw(*rs2));
+                self.wrw(*rd, rd_val);
+                self.advance_pc();
+            }
+            Divuw { rd, rs1, rs2 } => {
+                let rd_val = self.rruw(*rs1) / self.rruw(*rs2);
+                self.wrw(*rd, rd_val as i32);
+                self.advance_pc();
+            }
+            Remw { rd, rs1, rs2 } => {
+                let rd_val = self.rrw(*rs1).wrapping_rem(self.rrw(*rs2));
+                self.wrw(*rd, rd_val);
+                self.advance_pc();
+            }
+            Remuw { rd, rs1, rs2 } => {
+                let rd_val = self.rruw(*rs1).wrapping_rem(self.rruw(*rs2));
+                self.wrw(*rd, rd_val as i32);
                 self.advance_pc();
             }
             Addi { rd, rs1, imm } => {

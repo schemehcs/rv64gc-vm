@@ -59,6 +59,18 @@ int wcheck(void) {
     // fibonacci(7) = 13
     if (fibonacci(7) != 13)      return 0x10;
 
+    volatile int32_t x = 15;
+    volatile int32_t y = -4;
+    if (x * y != -60) return 0x11;
+    if (x / y != -3) return 0x12;
+    if (x % y != 3) return 0x13;
+
+    volatile uint32_t ux = 15;
+    volatile uint32_t uy = 4;
+    if (ux * uy != 60) return 0x14;
+    if (ux / uy != 3) return 0x15;
+    if (ux % uy != 3) return 0x16;
+
     // All tests passed! Write a magic signature to memory and return 0.
     g_bss_check = 0x0000600D;
     return 0;
@@ -104,6 +116,18 @@ int dcheck(void) {
     // 6. Function Calls & Stack Management (jal, jalr, sw/lw on sp)
     // fibonacci(7) = 13
     if (fibonacci_d(7) != 13)      return 0x70;
+
+    volatile int64_t x = 15;
+    volatile int64_t y = -4;
+    if (x * y != -60) return 0x71;
+    if (x / y != -3) return 0x72;
+    if (x % y != 3) return 0x73;
+
+    volatile uint64_t ux = 15;
+    volatile uint64_t uy = 4;
+    if (ux * uy != 60) return 0x14;
+    if (ux / uy != 3) return 0x15;
+    if (ux % uy != 3) return 0x16;
 
     // All tests passed! Write a magic signature to memory and return 0.
     g_bss_check_d = 0x0000600D;

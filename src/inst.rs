@@ -4,103 +4,361 @@ use std::fmt;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Instruction {
     /// ADD rd = rs1 + rs2
-    Add { rd: usize, rs1: usize, rs2: usize },
+    Add {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
     /// Sub rd = rs1 - rs2
-    Sub { rd: usize, rs1: usize, rs2: usize },
+    Sub {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
     /// XOR rd = rs1 ^ rs2
-    Xor { rd: usize, rs1: usize, rs2: usize },
+    Xor {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
     /// OR rd = rs1 | rs2
-    Or { rd: usize, rs1: usize, rs2: usize },
+    Or {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
     /// AND rd = rs1 & rs2
-    And { rd: usize, rs1: usize, rs2: usize },
+    And {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
     /// Shift Left Logical rd = rs1 << rs2
-    Sll { rd: usize, rs1: usize, rs2: usize },
+    Sll {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
     /// Shift Right Logical rd = rs1 >> rs2
-    Srl { rd: usize, rs1: usize, rs2: usize },
+    Srl {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
     /// Shift Right Arith* rd = rs1 >> rs2
-    Sra { rd: usize, rs1: usize, rs2: usize },
+    Sra {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
     /// Set Less Than rd = (rs1 < rs2)?1:0
-    Slt { rd: usize, rs1: usize, rs2: usize },
+    Slt {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
     /// Set Less Than(U) rd = (rs1 < rs2)?1:0
-    Sltu { rd: usize, rs1: usize, rs2: usize },
+    Sltu {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
+    Mul {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
+    Mulh {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
+    Mulhsu {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
+    Mulhu {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
+    Div {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
+    Divu {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
+    Rem {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
+    Remu {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
     /// Addw rd = sext(rs1[0:31] + rs2[0:31])
-    Addw { rd: usize, rs1: usize, rs2: usize },
+    Addw {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
     /// Subw rd = sext(rs1[0:31] - rs2[0:31])
-    Subw { rd: usize, rs1: usize, rs2: usize },
+    Subw {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
     /// Shift Left Logical word rd = rs1 << rs2
-    Sllw { rd: usize, rs1: usize, rs2: usize },
+    Sllw {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
     /// Shift Right Logical word rd = rs1 >> rs2
-    Srlw { rd: usize, rs1: usize, rs2: usize },
+    Srlw {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
     /// Shift Right Arith* word rd = rs1 >> rs2
-    Sraw { rd: usize, rs1: usize, rs2: usize },
+    Sraw {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
+    Mulw {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
+    Divw {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
+    Divuw {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
+    Remw {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
+    Remuw {
+        rd: usize,
+        rs1: usize,
+        rs2: usize,
+    },
     /// ADD Imm rd = rs1 + imm
-    Addi { rd: usize, rs1: usize, imm: i64 },
+    Addi {
+        rd: usize,
+        rs1: usize,
+        imm: i64,
+    },
     /// XOR Imm rd = rs1 ^ imm
-    Xori { rd: usize, rs1: usize, imm: i64 },
+    Xori {
+        rd: usize,
+        rs1: usize,
+        imm: i64,
+    },
     /// OR Imm rd = rs1 | imm
-    Ori { rd: usize, rs1: usize, imm: i64 },
+    Ori {
+        rd: usize,
+        rs1: usize,
+        imm: i64,
+    },
     /// AND Imm rd = rs1 & imm
-    Andi { rd: usize, rs1: usize, imm: i64 },
+    Andi {
+        rd: usize,
+        rs1: usize,
+        imm: i64,
+    },
     /// Shift Left Logical Imm rd = rs1 << imm
-    Slli { rd: usize, rs1: usize, imm: u32 },
+    Slli {
+        rd: usize,
+        rs1: usize,
+        imm: u32,
+    },
     /// Shift Right Logical Imm rd = rs1 >> imm
-    Srli { rd: usize, rs1: usize, imm: u32 },
+    Srli {
+        rd: usize,
+        rs1: usize,
+        imm: u32,
+    },
     /// Shift right Arith Imm rd = rs1 >> imm
-    Srai { rd: usize, rs1: usize, imm: u32 },
+    Srai {
+        rd: usize,
+        rs1: usize,
+        imm: u32,
+    },
     /// Set Less Than Imm rd = (rs1 < imm)?1:0
-    Slti { rd: usize, rs1: usize, imm: i64 },
+    Slti {
+        rd: usize,
+        rs1: usize,
+        imm: i64,
+    },
     /// Set Less Than Imm(U) rd = (rs1 < imm)?1:0
-    Sltiu { rd: usize, rs1: usize, imm: u64 },
+    Sltiu {
+        rd: usize,
+        rs1: usize,
+        imm: u64,
+    },
     /// Add Imm word rd = sign_extend(rs1[0:31] + Imm[0:31])
-    Addiw { rd: usize, rs1: usize, imm: i64 },
+    Addiw {
+        rd: usize,
+        rs1: usize,
+        imm: i64,
+    },
     /// Shift Left Logical Imm word rd = rs1 << imm
-    Slliw { rd: usize, rs1: usize, imm: u32 },
+    Slliw {
+        rd: usize,
+        rs1: usize,
+        imm: u32,
+    },
     /// Shift Right Logical Imm word rd = rs1 >> imm
-    Srliw { rd: usize, rs1: usize, imm: u32 },
+    Srliw {
+        rd: usize,
+        rs1: usize,
+        imm: u32,
+    },
     /// Shift right Arith Imm word rd = rs1 >> imm
-    Sraiw { rd: usize, rs1: usize, imm: u32 },
+    Sraiw {
+        rd: usize,
+        rs1: usize,
+        imm: u32,
+    },
     /// Load Byte rd = M[rs1+imm][0:7]
-    Lb { rd: usize, rs1: usize, imm: i64 },
+    Lb {
+        rd: usize,
+        rs1: usize,
+        imm: i64,
+    },
     /// Load Half rd = M[rs1+imm][0:15]
-    Lh { rd: usize, rs1: usize, imm: i64 },
+    Lh {
+        rd: usize,
+        rs1: usize,
+        imm: i64,
+    },
     /// Load Word rd = M[rs1+imm][0:31]
-    Lw { rd: usize, rs1: usize, imm: i64 },
+    Lw {
+        rd: usize,
+        rs1: usize,
+        imm: i64,
+    },
     /// Load double word
-    Ld { rd: usize, rs1: usize, imm: i64 },
+    Ld {
+        rd: usize,
+        rs1: usize,
+        imm: i64,
+    },
     /// Load Byte(U) rd = M[rs1+imm][0:7]
-    Lbu { rd: usize, rs1: usize, imm: i64 },
+    Lbu {
+        rd: usize,
+        rs1: usize,
+        imm: i64,
+    },
     /// Load Half(U) rd = M[rs1+imm][0:15]
-    Lhu { rd: usize, rs1: usize, imm: i64 },
+    Lhu {
+        rd: usize,
+        rs1: usize,
+        imm: i64,
+    },
     /// Load Word unsigned rd = zext(M[rs1+imm][0:31])
-    Lwu { rd: usize, rs1: usize, imm: i64 },
+    Lwu {
+        rd: usize,
+        rs1: usize,
+        imm: i64,
+    },
     /// Store Byte M[rs1+imm][0:7] = rs2[0:7]
-    Sb { rs2: usize, imm: i64, rs1: usize },
+    Sb {
+        rs2: usize,
+        imm: i64,
+        rs1: usize,
+    },
     /// Store Half M[rs1+imm][0:15] = rs2[0:15]
-    Sh { rs2: usize, imm: i64, rs1: usize },
+    Sh {
+        rs2: usize,
+        imm: i64,
+        rs1: usize,
+    },
     /// Store Word M[rs1+imm][0:31] = rs2[0:31]
-    Sw { rs2: usize, imm: i64, rs1: usize },
+    Sw {
+        rs2: usize,
+        imm: i64,
+        rs1: usize,
+    },
     /// Store Word M[rs1+imm][0:63] = rs2[0:63]
-    Sd { rs2: usize, imm: i64, rs1: usize },
+    Sd {
+        rs2: usize,
+        imm: i64,
+        rs1: usize,
+    },
     /// Branch == if(rs1==rs2) PC+=imm
-    Beq { rs1: usize, rs2: usize, imm: i64 },
+    Beq {
+        rs1: usize,
+        rs2: usize,
+        imm: i64,
+    },
     /// Branch != if(rs1!=rs2) PC+=imm
-    Bne { rs1: usize, rs2: usize, imm: i64 },
+    Bne {
+        rs1: usize,
+        rs2: usize,
+        imm: i64,
+    },
     /// Branch < if(rs1<rs2) PC+=imm
-    Blt { rs1: usize, rs2: usize, imm: i64 },
+    Blt {
+        rs1: usize,
+        rs2: usize,
+        imm: i64,
+    },
     /// Branch > if(rs1>rs2) PC+=imm
-    Bge { rs1: usize, rs2: usize, imm: i64 },
+    Bge {
+        rs1: usize,
+        rs2: usize,
+        imm: i64,
+    },
     /// Branch <(U) if(rs1<rs2) PC+=imm
-    Bltu { rs1: usize, rs2: usize, imm: i64 },
+    Bltu {
+        rs1: usize,
+        rs2: usize,
+        imm: i64,
+    },
     /// Branch >=(U) if(rs1>=rs2) PC+=imm
-    Bgeu { rs1: usize, rs2: usize, imm: i64 },
+    Bgeu {
+        rs1: usize,
+        rs2: usize,
+        imm: i64,
+    },
     /// Jump and Link rd = PC+4; PC+=imm
-    Jal { rd: usize, imm: i64 },
+    Jal {
+        rd: usize,
+        imm: i64,
+    },
     /// Jump and Link Reg rd=PC+4; PC=rs1+imm
-    Jalr { rd: usize, rs1: usize, imm: i64 },
+    Jalr {
+        rd: usize,
+        rs1: usize,
+        imm: i64,
+    },
     /// Load Upper Imm rd = imm << 12
-    Lui { rd: usize, imm: i64 },
+    Lui {
+        rd: usize,
+        imm: i64,
+    },
     /// Add Upper Imm to PC rd=PC+(imm<<12)
-    Auipc { rd: usize, imm: i64 },
+    Auipc {
+        rd: usize,
+        imm: i64,
+    },
     /// Env Call Transfer control to OS
     Ecall,
     /// Env Break Transfer control to debugger
@@ -123,11 +381,24 @@ impl fmt::Display for Instruction {
             Sra { rd, rs1, rs2 } => write!(f, "sra x{rd}, x{rs1}, x{rs2}"),
             Slt { rd, rs1, rs2 } => write!(f, "slt x{rd}, x{rs1}, x{rs2}"),
             Sltu { rd, rs1, rs2 } => write!(f, "sltu x{rd}, x{rs1}, x{rs2}"),
+            Mul { rd, rs1, rs2 } => write!(f, "mul x{rd}, x{rs1}, x{rs2}"),
+            Mulh { rd, rs1, rs2 } => write!(f, "mulh x{rd}, x{rs1}, x{rs2}"),
+            Mulhsu { rd, rs1, rs2 } => write!(f, "mulhsu x{rd}, x{rs1}, x{rs2}"),
+            Mulhu { rd, rs1, rs2 } => write!(f, "mulhu x{rd}, x{rs1}, x{rs2}"),
+            Div { rd, rs1, rs2 } => write!(f, "div x{rd}, x{rs1}, x{rs2}"),
+            Divu { rd, rs1, rs2 } => write!(f, "divu x{rd}, x{rs1}, x{rs2}"),
+            Rem { rd, rs1, rs2 } => write!(f, "rem x{rd}, x{rs1}, x{rs2}"),
+            Remu { rd, rs1, rs2 } => write!(f, "remu x{rd}, x{rs1}, x{rs2}"),
             Addw { rd, rs1, rs2 } => write!(f, "addw x{rd}, x{rs1}, x{rs2}"),
             Subw { rd, rs1, rs2 } => write!(f, "subw x{rd}, x{rs1}, x{rs2}"),
             Sllw { rd, rs1, rs2 } => write!(f, "sllw x{rd}, x{rs1}, x{rs2}"),
             Srlw { rd, rs1, rs2 } => write!(f, "srlw x{rd}, x{rs1}, x{rs2}"),
             Sraw { rd, rs1, rs2 } => write!(f, "sraw x{rd}, x{rs1}, x{rs2}"),
+            Mulw { rd, rs1, rs2 } => write!(f, "mulw x{rd}, x{rs1}, x{rs2}"),
+            Divw { rd, rs1, rs2 } => write!(f, "divw x{rd}, x{rs1}, x{rs2}"),
+            Divuw { rd, rs1, rs2 } => write!(f, "divuw x{rd}, x{rs1}, x{rs2}"),
+            Remw { rd, rs1, rs2 } => write!(f, "remw x{rd}, x{rs1}, x{rs2}"),
+            Remuw { rd, rs1, rs2 } => write!(f, "remuw x{rd}, x{rs1}, x{rs2}"),
             Addi { rd, rs1, imm } => write!(f, "addi x{rd}, x{rs1}, {imm}"),
             Xori { rd, rs1, imm } => write!(f, "xori x{rd}, x{rs1}, {imm}"),
             Ori { rd, rs1, imm } => write!(f, "ori x{rd}, x{rs1}, {imm}"),
@@ -348,6 +619,14 @@ impl TryFrom<u32> for Instruction {
                     (0x5, 0x20) => Ok(Sra { rd, rs1, rs2 }),
                     (0x2, 0x00) => Ok(Slt { rd, rs1, rs2 }),
                     (0x3, 0x00) => Ok(Sltu { rd, rs1, rs2 }),
+                    (0x0, 0x01) => Ok(Mul { rd, rs1, rs2 }),
+                    (0x1, 0x01) => Ok(Mulh { rd, rs1, rs2 }),
+                    (0x2, 0x01) => Ok(Mulhsu { rd, rs1, rs2 }),
+                    (0x3, 0x01) => Ok(Mulhu { rd, rs1, rs2 }),
+                    (0x4, 0x01) => Ok(Div { rd, rs1, rs2 }),
+                    (0x5, 0x01) => Ok(Divu { rd, rs1, rs2 }),
+                    (0x6, 0x01) => Ok(Rem { rd, rs1, rs2 }),
+                    (0x7, 0x01) => Ok(Remu { rd, rs1, rs2 }),
                     _ => bail!(
                         "invalid (funct3, funct7):({:x},{:x}), opcode:{:b}",
                         funct3,
@@ -371,6 +650,11 @@ impl TryFrom<u32> for Instruction {
                     (0x1, 0x00) => Ok(Sllw { rd, rs1, rs2 }),
                     (0x5, 0x00) => Ok(Srlw { rd, rs1, rs2 }),
                     (0x5, 0x20) => Ok(Sraw { rd, rs1, rs2 }),
+                    (0x0, 0x01) => Ok(Mulw { rd, rs1, rs2 }),
+                    (0x4, 0x01) => Ok(Divw { rd, rs1, rs2 }),
+                    (0x5, 0x01) => Ok(Divuw { rd, rs1, rs2 }),
+                    (0x6, 0x01) => Ok(Remw { rd, rs1, rs2 }),
+                    (0x7, 0x01) => Ok(Remuw { rd, rs1, rs2 }),
                     _ => bail!(
                         "invalid (funct3, funct7):({:x},{:x}), opcode:{:b}",
                         funct3,
@@ -616,11 +900,24 @@ impl From<Instruction> for u32 {
             Sra { rd, rs1, rs2 } => encode_r(0x33, 0x20, rs2, rs1, 5, rd),
             Slt { rd, rs1, rs2 } => encode_r(0x33, 0, rs2, rs1, 2, rd),
             Sltu { rd, rs1, rs2 } => encode_r(0x33, 0, rs2, rs1, 3, rd),
+            Mul { rd, rs1, rs2 } => encode_r(0x33, 1, rs2, rs1, 0, rd),
+            Mulh { rd, rs1, rs2 } => encode_r(0x33, 1, rs2, rs1, 1, rd),
+            Mulhsu { rd, rs1, rs2 } => encode_r(0x33, 1, rs2, rs1, 2, rd),
+            Mulhu { rd, rs1, rs2 } => encode_r(0x33, 1, rs2, rs1, 3, rd),
+            Div { rd, rs1, rs2 } => encode_r(0x33, 1, rs2, rs1, 4, rd),
+            Divu { rd, rs1, rs2 } => encode_r(0x33, 1, rs2, rs1, 5, rd),
+            Rem { rd, rs1, rs2 } => encode_r(0x33, 1, rs2, rs1, 6, rd),
+            Remu { rd, rs1, rs2 } => encode_r(0x33, 1, rs2, rs1, 7, rd),
             Addw { rd, rs1, rs2 } => encode_r(0x3b, 0, rs2, rs1, 0, rd),
             Subw { rd, rs1, rs2 } => encode_r(0x3b, 0x20, rs2, rs1, 0, rd),
             Sllw { rd, rs1, rs2 } => encode_r(0x3b, 0, rs2, rs1, 0x1, rd),
             Srlw { rd, rs1, rs2 } => encode_r(0x3b, 0, rs2, rs1, 0x5, rd),
             Sraw { rd, rs1, rs2 } => encode_r(0x3b, 0x20, rs2, rs1, 0x5, rd),
+            Mulw { rd, rs1, rs2 } => encode_r(0x3b, 1, rs2, rs1, 0, rd),
+            Divw { rd, rs1, rs2 } => encode_r(0x3b, 1, rs2, rs1, 4, rd),
+            Divuw { rd, rs1, rs2 } => encode_r(0x3b, 1, rs2, rs1, 5, rd),
+            Remw { rd, rs1, rs2 } => encode_r(0x3b, 1, rs2, rs1, 6, rd),
+            Remuw { rd, rs1, rs2 } => encode_r(0x3b, 1, rs2, rs1, 7, rd),
             Addi { rd, rs1, imm } => encode_i(0x13, 0, rd, rs1, imm),
             Xori { rd, rs1, imm } => encode_i(0x13, 4, rd, rs1, imm),
             Ori { rd, rs1, imm } => encode_i(0x13, 6, rd, rs1, imm),
@@ -815,6 +1112,7 @@ mod parser_tests {
             },
         );
     }
+
     #[test]
     fn decodes_sllw() {
         assert_round_trip(
